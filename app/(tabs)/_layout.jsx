@@ -1,23 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs, useRouter } from "expo-router";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+// 1. Import SafeAreaInsets
 import {
-  Image,
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
-// 1. Import the Hook
 import { useTheme } from "../../context/ThemeContext";
 
-// --- CUSTOM HEADER ---
 const CustomHeader = () => {
   const router = useRouter();
-
-  // 2. Consume the Global Theme Context
   const { isDark, toggleTheme, activeColors } = useTheme();
 
   return (
@@ -46,7 +39,6 @@ const CustomHeader = () => {
         </View>
 
         <View style={styles.headerRight}>
-          {/* THEME TOGGLE BUTTON */}
           <TouchableOpacity
             onPress={toggleTheme}
             style={[styles.iconBtn, { backgroundColor: activeColors.inputBg }]}
@@ -83,13 +75,15 @@ const CustomHeader = () => {
 };
 
 export default function TabLayout() {
-  // 3. Consume Context here for Tab Bar styling
   const { activeColors } = useTheme();
+
+  // 2. Get safe area insets (bottom is crucial here)
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
       screenOptions={{
-        header: () => <CustomHeader />, // No need to pass props, header uses context
+        header: () => <CustomHeader />,
         tabBarActiveTintColor: activeColors.secondary,
         tabBarInactiveTintColor: activeColors.textSecondary,
         tabBarShowLabel: true,
@@ -98,8 +92,14 @@ export default function TabLayout() {
           backgroundColor: activeColors.background,
           borderTopColor: activeColors.border,
           borderTopWidth: 1,
-          height: Platform.OS === "ios" ? 85 : 70,
-          paddingBottom: Platform.OS === "ios" ? 28 : 12,
+
+          // 3. DYNAMIC HEIGHT & PADDING CALCULATION
+          // Base height (60) + Safe Area Bottom Inset
+          height: 60 + (insets.bottom > 0 ? insets.bottom : 10),
+
+          // Padding bottom matches the inset (or defaults to 10px)
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 10,
+
           paddingTop: 8,
           elevation: 10,
           shadowColor: "#000",
@@ -141,7 +141,6 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Center Tab */}
       <Tabs.Screen
         name="analysis"
         options={{
@@ -195,14 +194,14 @@ export default function TabLayout() {
         }}
       />
 
-      <Tabs.Screen
+      {/* <Tabs.Screen
         name="testRunner"
         options={{ href: null, header: () => null }}
-      />
-      <Tabs.Screen
+      /> */}
+      {/* <Tabs.Screen
         name="testResult"
         options={{ href: null, header: () => null }}
-      />
+      /> */}
     </Tabs>
   );
 }
@@ -216,7 +215,6 @@ const styles = StyleSheet.create({
     elevation: 4,
     borderBottomWidth: 1,
     paddingHorizontal: 16,
-    paddingBottom: 10,
   },
   headerContent: {
     flexDirection: "row",

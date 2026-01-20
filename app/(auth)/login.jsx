@@ -18,16 +18,14 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-// Import your Color Constants
 import { Colors } from "../../src/constants/Colors";
 
 const { width, height } = Dimensions.get("window");
 
 export default function LoginScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme() ?? "light";
-  const theme = Colors[colorScheme];
+  const scheme = useColorScheme() ?? "light";
+  const theme = Colors[scheme];
   const [phone, setPhone] = useState("");
 
   const handleGetOTP = () => {
@@ -40,311 +38,217 @@ export default function LoginScreen() {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      {/* Container Background matches the Illustration's Blue */}
-      <View style={[styles.container, { backgroundColor: theme.primary }]}>
-        <StatusBar style="light" />
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.primary }]}
+    >
+      <StatusBar style="light" />
 
-        <SafeAreaView style={styles.safeArea}>
-          {/* 1. HEADER & ILLUSTRATION */}
-          <View style={styles.topSection}>
-            {/* Clean Logo Header */}
-            <View style={styles.headerRow}>
-              <Text style={styles.brandText}>Dekho Exam</Text>
-            </View>
+      {/* ================= TOP SECTION ================= */}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.topSection}>
+          <Text style={styles.brandText}>Dekho Exam</Text>
 
-            {/* Floating 3D Image */}
-            <View style={styles.imageWrapper}>
-              <Image
-                source={require("../../assets/images/desk.png")}
-                style={styles.illustration}
-                resizeMode="contain"
-              />
-            </View>
-          </View>
-        </SafeAreaView>
+          <Image
+            source={require("../../assets/images/desk.png")}
+            style={styles.illustration}
+            resizeMode="contain"
+          />
+        </View>
+      </TouchableWithoutFeedback>
 
-        {/* 2. MODERN BOTTOM SHEET */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.keyboardView}
-        >
-          <View
-            style={[styles.bottomSheet, { backgroundColor: theme.background }]}
+      {/* ================= BOTTOM SHEET ================= */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={[styles.sheet, { backgroundColor: theme.background }]}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.sheetContent}
           >
-            {/* Decorative Handle Bar */}
-            <View
-              style={[styles.sheetHandle, { backgroundColor: theme.border }]}
-            />
+            <View style={[styles.handle, { backgroundColor: theme.border }]} />
 
-            <ScrollView
-              contentContainerStyle={styles.sheetContent}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={styles.textBlock}>
-                <Text style={[styles.title, { color: theme.text }]}>
-                  Welcome Back!
-                </Text>
-                <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-                  Start your study session by logging in.
-                </Text>
-              </View>
+            <Text style={[styles.title, { color: theme.text }]}>
+              Welcome back
+            </Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+              Enter your mobile number to continue
+            </Text>
 
-              {/* Modern Input Group */}
-              <Text style={[styles.label, { color: theme.text }]}>
-                Mobile Number
-              </Text>
+            <Text style={[styles.label, { color: theme.text }]}>
+              Mobile number
+            </Text>
 
-              <View style={styles.inputGroup}>
-                {/* Country Code */}
-                <View
-                  style={[
-                    styles.countryBox,
-                    {
-                      backgroundColor: theme.inputBg,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                >
-                  <Text style={styles.flag}>🇮🇳</Text>
-                  <Text style={[styles.countryText, { color: theme.text }]}>
-                    +91
-                  </Text>
-                  <Ionicons
-                    name="chevron-down"
-                    size={12}
-                    color={theme.textSecondary}
-                  />
-                </View>
-
-                {/* Phone Input */}
-                <TextInput
-                  style={[
-                    styles.inputField,
-                    {
-                      backgroundColor: theme.inputBg,
-                      color: theme.text,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                  placeholder="98765 43210"
-                  placeholderTextColor={theme.textSecondary}
-                  keyboardType="number-pad"
-                  maxLength={10}
-                  value={phone}
-                  onChangeText={setPhone}
-                />
-              </View>
-
-              {/* Primary Action Button */}
-              <TouchableOpacity
+            <View style={styles.inputRow}>
+              <View
                 style={[
-                  styles.btn,
+                  styles.countryBox,
                   {
-                    backgroundColor: theme.secondary,
-                    shadowColor: theme.secondary,
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.border,
                   },
                 ]}
-                activeOpacity={0.8}
-                onPress={handleGetOTP}
               >
-                <Text style={styles.btnText}>Get OTP</Text>
-                <Ionicons
-                  name="arrow-forward"
-                  size={20}
-                  color="#FFF"
-                  style={{ marginLeft: 8 }}
-                />
-              </TouchableOpacity>
-
-              {/* Footer */}
-              <View style={styles.footer}>
-                <Text
-                  style={[styles.footerText, { color: theme.textSecondary }]}
-                >
-                  New here?{" "}
+                <Text style={styles.flag}>🇮🇳</Text>
+                <Text style={[styles.countryText, { color: theme.text }]}>
+                  +91
                 </Text>
-                <TouchableOpacity onPress={() => alert("Go to Signup")}>
-                  <Text style={[styles.linkText, { color: theme.secondary }]}>
-                    Create Account
-                  </Text>
-                </TouchableOpacity>
+                <Ionicons
+                  name="chevron-down"
+                  size={12}
+                  color={theme.textSecondary}
+                />
               </View>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </View>
-    </TouchableWithoutFeedback>
+
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.inputBg,
+                    color: theme.text,
+                    borderColor: theme.border,
+                  },
+                ]}
+                placeholder="98765 43210"
+                placeholderTextColor={theme.textSecondary}
+                keyboardType="number-pad"
+                maxLength={10}
+                value={phone}
+                onChangeText={setPhone}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.button,
+                {
+                  backgroundColor: theme.secondary,
+                  shadowColor: theme.secondary,
+                },
+              ]}
+              onPress={handleGetOTP}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.buttonText}>Continue</Text>
+              <Ionicons
+                name="arrow-forward"
+                size={18}
+                color="#FFF"
+                style={{ marginLeft: 8 }}
+              />
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
+/* ================= STYLES ================= */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
+  container: { flex: 1 },
 
-  // --- TOP SECTION ---
+  /* ---------- TOP ---------- */
   topSection: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "flex-start",
-    paddingTop: 10,
-  },
-  headerRow: {
-    position: "absolute",
-    top: 20,
-    left: 24,
-    zIndex: 10,
-  },
-  brandText: {
-    color: "#FFFFFF",
-    fontWeight: "800", // Extra Bold
-    fontSize: 22,
-    letterSpacing: 0.5,
-    textShadowColor: "rgba(0, 0, 0, 0.1)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
-  imageWrapper: {
-    width: width * 2.2,
-    height: height * 0.45,
-    marginTop: 20,
+    height: height * 0.42,
     justifyContent: "center",
     alignItems: "center",
-    // Soft shadow to make the desk float
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 15 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+  },
+  brandText: {
+    position: "absolute",
+    top: 24,
+    left: 24,
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#FFF",
+    letterSpacing: 0.5,
   },
   illustration: {
-    width: "90%",
-    height: "100%",
+    width: width * 0.9,
+    height: height * 0.3,
   },
 
-  // --- BOTTOM SHEET ---
-  keyboardView: {
-    justifyContent: "flex-end",
-  },
-  bottomSheet: {
+  /* ---------- SHEET ---------- */
+  sheet: {
+    flex: 1,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: 30,
-    minHeight: height * 0.45,
-    // Heavy shadow for "Card" effect
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 25,
+    elevation: 30,
   },
-  sheetHandle: {
+  handle: {
     width: 40,
     height: 4,
     borderRadius: 2,
     alignSelf: "center",
-    marginBottom: 20,
-    opacity: 0.5,
+    marginBottom: 24,
+    opacity: 0.6,
   },
   sheetContent: {
-    paddingBottom: 20,
+    paddingBottom: 32,
   },
 
-  // Typography
-  textBlock: {
-    marginBottom: 25,
-  },
   title: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: "800",
-    marginBottom: 8,
-    letterSpacing: -0.5,
+    marginBottom: 6,
   },
   subtitle: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: "500",
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 28,
   },
   label: {
     fontSize: 14,
     fontWeight: "700",
     marginBottom: 10,
-    marginLeft: 4,
   },
 
-  // Inputs
-  inputGroup: {
+  /* ---------- INPUT ---------- */
+  inputRow: {
     flexDirection: "row",
-    marginBottom: 30,
     gap: 12,
+    marginBottom: 28,
   },
   countryBox: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
     borderRadius: 16,
-    height: 58,
+    height: 56,
     borderWidth: 1,
-    borderColor: "transparent", // Setup for future focus state
   },
-  flag: { fontSize: 22, marginRight: 6 },
-  countryText: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginRight: 4,
-  },
-  inputField: {
+  flag: { fontSize: 20, marginRight: 6 },
+  countryText: { fontSize: 16, fontWeight: "700", marginRight: 4 },
+
+  input: {
     flex: 1,
+    height: 56,
     borderRadius: 16,
-    height: 58,
     paddingHorizontal: 18,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "600",
-    letterSpacing: 0.5,
     borderWidth: 1,
-    borderColor: "transparent",
   },
 
-  // Button
-  btn: {
-    height: 60,
+  /* ---------- BUTTON ---------- */
+  button: {
+    height: 56,
     borderRadius: 18,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 24,
-    // Vibrant Glow Shadow
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.35,
     shadowRadius: 12,
     elevation: 8,
   },
-  btnText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "bold",
-    letterSpacing: 0.5,
-  },
-
-  // Footer
-  footer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  footerText: {
-    fontSize: 15,
-    fontWeight: "500",
-  },
-  linkText: {
-    fontSize: 15,
-    fontWeight: "800",
+  buttonText: {
+    color: "#FFF",
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: 0.4,
   },
 });

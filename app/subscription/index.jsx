@@ -1,21 +1,60 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 import { useTheme } from "../../context/ThemeContext";
 import { ThemedScreen } from "../../src/components/ThemedScreen";
 import { ThemedText } from "../../src/components/ThemedText";
 
+// Import the Service
+import { startPayment } from "../../services/paymentService";
+
 export default function SubscriptionScreen() {
   const router = useRouter();
   const { activeColors, isDark } = useTheme();
 
-  // Mock Plan Data (Change isPro to true/false to see different states)
-  const isPro = true;
+  const [loading, setLoading] = useState(false);
+  const [isPro, setIsPro] = useState(false); // Simulating User Status
+
+  const handleBuySubscription = async () => {
+    try {
+      setLoading(true);
+      console.log("Starting Payment...");
+      const paymentData = await startPayment({
+        amount: 499,
+        email: "student@dekhoexam.com",
+        contact: "9999999999",
+      });
+
+      Alert.alert(
+        "Payment Success",
+        `Payment ID:\n${paymentData.razorpay_payment_id}`,
+      );
+
+      // TEMP: simulate unlock
+      setIsPro(true);
+    } catch (error) {
+      if (error?.code !== 0) {
+        Alert.alert(
+          "Payment Failed",
+          error?.description || "Payment cancelled",
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <ThemedScreen>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={activeColors.text} />
@@ -97,7 +136,7 @@ export default function SubscriptionScreen() {
           )}
         </View>
 
-        {/* Upsell / Renewal Section */}
+        {/* Action Section */}
         <View style={styles.actionSection}>
           <ThemedText variant="subtitle" style={{ marginBottom: 10 }}>
             {isPro ? "Extend your plan" : "Why Upgrade?"}
@@ -105,61 +144,79 @@ export default function SubscriptionScreen() {
 
           <TouchableOpacity
             style={[styles.upgradeBtn, { borderColor: activeColors.secondary }]}
-            onPress={() => router.push("/(tabs)/pass")}
+            onPress={handleBuySubscription}
+            disabled={loading}
           >
-            <View>
-              <ThemedText
-                style={{
-                  fontSize: 16,
-                  fontWeight: "bold",
-                  color: activeColors.text,
-                }}
-              >
-                {isPro ? "Renew Subscription" : "Get DekhoExam PRO"}
-              </ThemedText>
-              <ThemedText
-                variant="caption"
-                style={{ color: activeColors.secondary }}
-              >
-                Starts at ₹499/year
-              </ThemedText>
-            </View>
-            <Ionicons
-              name="arrow-forward-circle"
-              size={32}
-              color={activeColors.secondary}
-            />
+            {loading ? (
+              <View style={{ flex: 1, alignItems: "center" }}>
+                <ActivityIndicator
+                  size="small"
+                  color={activeColors.secondary}
+                />
+              </View>
+            ) : (
+              <>
+                <View>
+                  <ThemedText
+                    style={{
+                      fontSize: 16,
+                      fontWeight: "bold",
+                      color: activeColors.text,
+                    }}
+                  >
+                    {isPro ? "Renew Subscription" : "Get DekhoExam PRO"}
+                  </ThemedText>
+                  <ThemedText
+                    variant="caption"
+                    style={{ color: activeColors.secondary }}
+                  >
+                    Starts at ₹499/year
+                  </ThemedText>
+                </View>
+                <Ionicons
+                  name="arrow-forward-circle"
+                  size={32}
+                  color={activeColors.secondary}
+                />
+              </>
+            )}
           </TouchableOpacity>
         </View>
 
-        {/* Transaction History Mock */}
-        <ThemedText
-          variant="subtitle"
-          style={{ marginTop: 30, marginBottom: 15 }}
-        >
-          Payment History
-        </ThemedText>
-        <View
-          style={[
-            styles.historyCard,
-            {
-              backgroundColor: isDark ? activeColors.card : "#FFF",
-              borderColor: activeColors.border,
-            },
-          ]}
-        >
-          <View style={styles.historyRow}>
-            <View>
-              <ThemedText style={{ fontWeight: "600" }}>Annual Plan</ThemedText>
-              <ThemedText variant="caption">25 Oct, 2023</ThemedText>
-            </View>
+        {/* History Mock */}
+        {isPro && (
+          <>
             <ThemedText
-              style={{ fontWeight: "bold", color: activeColors.success }}
+              variant="subtitle"
+              style={{ marginTop: 30, marginBottom: 15 }}
             >
-              ₹499
+              Payment History
             </ThemedText>
-          </View>
-        </View>
+            <View
+              style={[
+                styles.historyCard,
+                {
+                  backgroundColor: isDark ? activeColors.card : "#FFF",
+                  borderColor: activeColors.border,
+                },
+              ]}
+            >
+              <View style={styles.historyRow}>
+                <View>
+                  <ThemedText style={{ fontWeight: "600" }}>
+                    Annual Plan
+                  </ThemedText>
+                  <ThemedText variant="caption">Today</ThemedText>
+                </View>
+                <ThemedText
+                  style={{ fontWeight: "bold", color: activeColors.success }}
+                >
+                  ₹499
+                </ThemedText>
+              </View>
+            </View>
+          </>
+        )}
       </ScrollView>
     </ThemedScreen>
   );
@@ -173,7 +230,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   backBtn: { padding: 4 },
-
   planCard: {
     borderRadius: 20,
     padding: 20,
@@ -198,7 +254,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   detailRow: { flexDirection: "row", alignItems: "center" },
-
   actionSection: { marginBottom: 10 },
   upgradeBtn: {
     flexDirection: "row",
@@ -209,7 +264,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderStyle: "dashed",
   },
-
   historyCard: { borderRadius: 16, borderWidth: 1, padding: 16 },
   historyRow: {
     flexDirection: "row",

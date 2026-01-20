@@ -3,22 +3,21 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import {
-    Dimensions,
-    Image,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    useColorScheme,
-    View,
+  Dimensions,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  useColorScheme,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { Colors } from "../../src/constants/Colors";
 
 const { width, height } = Dimensions.get("window");
@@ -26,315 +25,252 @@ const { width, height } = Dimensions.get("window");
 export default function OTPScreen() {
   const router = useRouter();
   const { phone } = useLocalSearchParams();
-  const colorScheme = useColorScheme() ?? "light";
-  const theme = Colors[colorScheme];
+  const scheme = useColorScheme() ?? "light";
+  const theme = Colors[scheme];
 
-  // OTP State
-  const [otp, setOtp] = useState(["", "", "", ""]);
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const inputs = useRef([]);
-
-  // Timer State
   const [timer, setTimer] = useState(30);
 
-  // Timer Countdown Logic
   useEffect(() => {
-    let interval;
-    if (timer > 0) {
-      interval = setInterval(() => {
-        setTimer((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
+    if (timer <= 0) return;
+    const i = setInterval(() => setTimer((t) => t - 1), 1000);
+    return () => clearInterval(i);
   }, [timer]);
 
-  // Handle Input Change
   const handleChange = (text, index) => {
-    const newOtp = [...otp];
-    newOtp[index] = text;
-    setOtp(newOtp);
-
-    // Move Forward
-    if (text && index < 3) {
-      inputs.current[index + 1].focus();
-    }
-    // Move Backward on empty (handled in onKeyPress usually, but basic logic here)
-    if (!text && index > 0) {
-      inputs.current[index - 1].focus();
-    }
+    const next = [...otp];
+    next[index] = text;
+    setOtp(next);
+    if (text && index < 3) inputs.current[index + 1]?.focus();
+    if (!text && index > 0) inputs.current[index - 1]?.focus();
   };
 
-  // Handle Backspace specifically
   const handleKeyPress = (e, index) => {
     if (e.nativeEvent.key === "Backspace" && !otp[index] && index > 0) {
-      inputs.current[index - 1].focus();
+      inputs.current[index - 1]?.focus();
     }
   };
 
   const handleVerify = () => {
-    const code = otp.join("");
-    if (code.length === 4) {
-      // Navigate to Home
+    if (otp.join("").length === 6) {
       router.replace("/(tabs)");
     } else {
-      alert("Please enter a valid 4-digit code");
+      alert("Enter valid 6-digit code");
     }
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <View style={[styles.container, { backgroundColor: theme.primary }]}>
-        <StatusBar style="light" />
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.primary }]}
+    >
+      <StatusBar style="light" />
 
-        <SafeAreaView style={styles.safeArea}>
-          {/* 1. HEADER & BACK BUTTON */}
-          <View style={styles.topSection}>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={styles.backBtn}
-            >
-              <Ionicons name="arrow-back" size={24} color="#FFF" />
-            </TouchableOpacity>
-
-            <View style={styles.imageWrapper}>
-              {/* Reusing the Desk Image for consistency, or swap for a Lock/Shield image */}
-              <Image
-                source={require("../../assets/images/login.png")}
-                style={styles.illustration}
-                resizeMode="contain"
-              />
-            </View>
-          </View>
-        </SafeAreaView>
-
-        {/* 2. BOTTOM SHEET */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.keyboardView}
-        >
-          <View
-            style={[styles.bottomSheet, { backgroundColor: theme.background }]}
+      {/* TOP */}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.top}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtn}
           >
-            {/* Drag Handle */}
-            <View
-              style={[styles.sheetHandle, { backgroundColor: theme.border }]}
-            />
+            <Ionicons name="arrow-back" size={22} color="#FFF" />
+          </TouchableOpacity>
 
-            <ScrollView
-              contentContainerStyle={styles.sheetContent}
-              keyboardShouldPersistTaps="handled"
-            >
-              <View style={styles.textBlock}>
-                <Text style={[styles.title, { color: theme.text }]}>
-                  Verification
-                </Text>
-                <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-                  Enter the code sent to{" "}
-                  <Text style={{ fontWeight: "800", color: theme.text }}>
-                    +91 {phone}
+          <Image
+            source={require("../../assets/images/login.png")}
+            style={styles.illustration}
+            resizeMode="contain"
+          />
+        </View>
+      </TouchableWithoutFeedback>
+
+      {/* BOTTOM */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={[styles.sheet, { backgroundColor: theme.background }]}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.sheetContent}
+          >
+            <View style={[styles.handle, { backgroundColor: theme.border }]} />
+
+            <Text style={[styles.title, { color: theme.text }]}>
+              Verify OTP
+            </Text>
+
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+              Enter the 6-digit code sent to{" "}
+              <Text style={{ fontWeight: "700", color: theme.text }}>
+                +91 {phone}
+              </Text>
+            </Text>
+
+            {/* OTP */}
+            <View style={styles.otpRow}>
+              {otp.map((d, i) => (
+                <TextInput
+                  key={i}
+                  ref={(r) => (inputs.current[i] = r)}
+                  value={d}
+                  onChangeText={(t) => handleChange(t, i)}
+                  onKeyPress={(e) => handleKeyPress(e, i)}
+                  keyboardType="number-pad"
+                  maxLength={1}
+                  textAlign="center"
+                  style={[
+                    styles.otpBox,
+                    {
+                      backgroundColor: theme.inputBg,
+                      color: theme.text,
+                      borderColor: d ? theme.secondary : theme.border,
+                    },
+                  ]}
+                />
+              ))}
+            </View>
+
+            {/* RESEND */}
+            <View style={styles.resend}>
+              {timer > 0 ? (
+                <Text style={{ color: theme.textSecondary }}>
+                  Resend in{" "}
+                  <Text style={{ color: theme.secondary, fontWeight: "700" }}>
+                    00:{timer < 10 ? `0${timer}` : timer}
                   </Text>
                 </Text>
-              </View>
-
-              {/* OTP Inputs */}
-              <View style={styles.otpContainer}>
-                {otp.map((digit, index) => (
-                  <TextInput
-                    key={index}
-                    ref={(ref) => (inputs.current[index] = ref)}
-                    style={[
-                      styles.otpBox,
-                      {
-                        backgroundColor: theme.inputBg,
-                        color: theme.text,
-                        borderColor: digit ? theme.secondary : "transparent", // Highlight on fill
-                        borderWidth: digit ? 2 : 1,
-                      },
-                    ]}
-                    keyboardType="number-pad"
-                    maxLength={1}
-                    value={digit}
-                    onChangeText={(text) => handleChange(text, index)}
-                    onKeyPress={(e) => handleKeyPress(e, index)}
-                    textAlign="center"
-                  />
-                ))}
-              </View>
-
-              {/* Resend Timer */}
-              <View style={styles.resendContainer}>
-                {timer > 0 ? (
+              ) : (
+                <TouchableOpacity onPress={() => setTimer(30)}>
                   <Text
-                    style={[styles.resendText, { color: theme.textSecondary }]}
+                    style={{
+                      color: theme.secondary,
+                      fontWeight: "700",
+                    }}
                   >
-                    Resend code in{" "}
-                    <Text
-                      style={{ color: theme.secondary, fontWeight: "bold" }}
-                    >
-                      00:{timer < 10 ? `0${timer}` : timer}
-                    </Text>
+                    Resend Code
                   </Text>
-                ) : (
-                  <TouchableOpacity onPress={() => setTimer(30)}>
-                    <Text style={[styles.linkText, { color: theme.secondary }]}>
-                      Resend Code
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+                </TouchableOpacity>
+              )}
+            </View>
 
-              {/* Verify Button */}
-              <TouchableOpacity
-                style={[styles.btn, { backgroundColor: theme.secondary }]}
-                activeOpacity={0.8}
-                onPress={handleVerify}
-              >
-                <Text style={styles.btnText}>Verify & Login</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </View>
-    </TouchableWithoutFeedback>
+            {/* CTA */}
+            <TouchableOpacity
+              style={[
+                styles.button,
+                {
+                  backgroundColor: theme.secondary,
+                  shadowColor: theme.secondary,
+                },
+              ]}
+              activeOpacity={0.85}
+              onPress={handleVerify}
+            >
+              <Text style={styles.buttonText}>Verify & Continue</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
+/* ================= STYLES ================= */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
+  container: { flex: 1 },
 
-  // --- TOP SECTION ---
-  topSection: {
-    flex: 1,
+  /* TOP */
+  top: {
+    height: height * 0.38,
+    justifyContent: "center",
     alignItems: "center",
-    paddingTop: 10,
   },
   backBtn: {
     position: "absolute",
-    top: 20,
+    top: 24,
     left: 24,
-    zIndex: 10,
     padding: 8,
-    backgroundColor: "rgba(255,255,255,0.2)", // Glass effect
+    backgroundColor: "rgba(255,255,255,0.18)",
     borderRadius: 12,
   },
-  imageWrapper: {
-    width: width * 0.8,
-    height: height * 0.35,
-    marginTop: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
-  },
   illustration: {
-    width: "100%",
-    height: "100%",
+    width: width * 0.75,
+    height: height * 0.28,
   },
 
-  // --- BOTTOM SHEET ---
-  keyboardView: {
-    justifyContent: "flex-end",
-  },
-  bottomSheet: {
+  /* SHEET */
+  sheet: {
+    flex: 1,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 30,
-    minHeight: height * 0.5, // Taller sheet for OTP
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 25,
+    paddingTop: 14,
+    elevation: 20,
   },
-  sheetHandle: {
-    width: 40,
+  handle: {
+    width: 36,
     height: 4,
     borderRadius: 2,
     alignSelf: "center",
-    marginBottom: 20,
+    marginBottom: 24,
     opacity: 0.5,
   },
   sheetContent: {
-    paddingBottom: 20,
+    paddingBottom: 32,
   },
 
-  // Typography
-  textBlock: {
-    marginBottom: 30,
-    alignItems: "center",
-  },
   title: {
     fontSize: 28,
     fontWeight: "800",
-    marginBottom: 8,
+    textAlign: "center",
+    marginBottom: 6,
   },
   subtitle: {
     fontSize: 15,
-    textAlign: "center",
     lineHeight: 22,
+    textAlign: "center",
+    marginBottom: 28,
   },
 
-  // OTP Inputs
-  otpContainer: {
+  /* OTP */
+  otpRow: {
     flexDirection: "row",
-    justifyContent: "space-between", // Spreads them evenly
-    marginBottom: 30,
+    justifyContent: "space-between",
+    marginBottom: 26,
     paddingHorizontal: 10,
   },
   otpBox: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    fontSize: 24,
-    fontWeight: "bold",
-    // Shadow for depth
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    fontSize: 22,
+    fontWeight: "700",
+    borderWidth: 1.5,
   },
 
-  // Resend Timer
-  resendContainer: {
+  /* RESEND */
+  resend: {
     alignItems: "center",
-    marginBottom: 30,
-    height: 20, // Fixed height to prevent jump
-  },
-  resendText: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  linkText: {
-    fontSize: 15,
-    fontWeight: "800",
+    marginBottom: 26,
+    minHeight: 18,
   },
 
-  // Button
-  btn: {
-    height: 58,
+  /* BUTTON */
+  button: {
+    height: 56,
     borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.35,
     shadowRadius: 12,
     elevation: 8,
   },
-  btnText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "bold",
-    letterSpacing: 0.5,
+  buttonText: {
+    color: "#FFF",
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: 0.4,
   },
 });

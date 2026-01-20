@@ -1,12 +1,24 @@
 import { Ionicons } from "@expo/vector-icons";
-import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 import { useTheme } from "../../context/ThemeContext";
 import { ThemedScreen } from "../../src/components/ThemedScreen";
 import { ThemedText } from "../../src/components/ThemedText";
 
+// Razorpay Service
+import { useState } from "react";
+import { startPayment } from "../../services/paymentService";
+
 export default function PassScreen() {
   const { activeColors } = useTheme();
+  const [loading, setLoading] = useState(false);
 
   const FeatureItem = ({ text }) => (
     <View style={styles.featureRow}>
@@ -15,129 +27,214 @@ export default function PassScreen() {
         size={20}
         color={activeColors.success}
       />
-      <ThemedText style={{ marginLeft: 10 }}>{text}</ThemedText>
+      <ThemedText style={styles.featureText}>{text}</ThemedText>
     </View>
   );
 
+  /* ================= PAYMENT HANDLER ================= */
+  const handleBuyPass = async () => {
+    try {
+      setLoading(true);
+
+      const paymentData = await startPayment({
+        amount: 499,
+        email: "student@dekhoexam.com",
+        contact: "9999999999",
+        packageName: "DekhoExam PRO",
+      });
+
+      Alert.alert(
+        "Payment Successful 🎉",
+        `Payment ID:\n${paymentData.razorpay_payment_id}`,
+      );
+
+      // TODO (Production):
+      // Send paymentData to backend for verification
+      // Unlock PRO features
+    } catch (error) {
+      if (error?.code !== 0) {
+        Alert.alert(
+          "Payment Failed",
+          error?.description || "Payment cancelled",
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <ThemedScreen edges={["left", "right", "bottom"]}>
-      <ScrollView contentContainerStyle={styles.container}>
-        {/* Hero Section */}
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ================= HERO ================= */}
         <View style={[styles.hero, { backgroundColor: activeColors.primary }]}>
-          <Ionicons
-            name="diamond"
-            size={60}
-            color="#FFD700"
-            style={{ marginBottom: 10 }}
-          />
-          <ThemedText
-            style={{ color: "#FFF", fontSize: 24, fontWeight: "bold" }}
-          >
-            DekhoExam PRO
-          </ThemedText>
-          <ThemedText
-            style={{
-              color: "rgba(255,255,255,0.8)",
-              textAlign: "center",
-              marginTop: 5,
-            }}
-          >
-            Unlock unlimited access to all tests and detailed analysis.
+          <View style={styles.heroIcon}>
+            <Ionicons name="diamond" size={36} color="#FFD700" />
+          </View>
+
+          <ThemedText style={styles.heroTitle}>DekhoExam PRO</ThemedText>
+
+          <ThemedText style={styles.heroSubtitle}>
+            Unlock unlimited access to all tests, analysis, and rankings.
           </ThemedText>
         </View>
 
-        {/* Features List */}
+        {/* ================= FEATURES ================= */}
         <View style={styles.features}>
           <FeatureItem text="500+ Full Mock Tests" />
-          <FeatureItem text="Detailed Solution & Analysis" />
+          <FeatureItem text="Detailed Solutions & Analysis" />
           <FeatureItem text="All India Rank Prediction" />
           <FeatureItem text="Ad-Free Experience" />
         </View>
 
-        {/* Pricing Cards */}
-        <TouchableOpacity
-          style={[styles.planCard, { borderColor: activeColors.secondary }]}
+        {/* ================= PLAN ================= */}
+        <View
+          style={[
+            styles.planCard,
+            {
+              borderColor: activeColors.secondary,
+              backgroundColor: activeColors.card,
+            },
+          ]}
         >
           <View>
-            <ThemedText style={{ fontWeight: "bold", fontSize: 18 }}>
-              12 Months Pass
-            </ThemedText>
-            <ThemedText
-              variant="caption"
-              style={{ textDecorationLine: "line-through" }}
-            >
+            <ThemedText style={styles.planTitle}>12 Months Pass</ThemedText>
+            <ThemedText variant="caption" style={styles.strikePrice}>
               ₹999
             </ThemedText>
           </View>
-          <View style={{ alignItems: "flex-end" }}>
+
+          <View style={styles.priceRight}>
             <ThemedText
-              style={{
-                fontWeight: "bold",
-                fontSize: 22,
-                color: activeColors.secondary,
-              }}
+              style={[styles.finalPrice, { color: activeColors.secondary }]}
             >
               ₹499
             </ThemedText>
-            <View
-              style={{
-                backgroundColor: "#DCFCE7",
-                paddingHorizontal: 6,
-                borderRadius: 4,
-              }}
-            >
-              <ThemedText
-                style={{ fontSize: 10, color: "#166534", fontWeight: "bold" }}
-              >
-                50% OFF
-              </ThemedText>
+
+            <View style={styles.discountBadge}>
+              <ThemedText style={styles.discountText}>SAVE 50%</ThemedText>
             </View>
           </View>
-        </TouchableOpacity>
+        </View>
 
-        {/* Buy Button */}
+        {/* ================= BUY BUTTON ================= */}
         <TouchableOpacity
           style={[styles.buyBtn, { backgroundColor: activeColors.secondary }]}
+          activeOpacity={0.85}
+          onPress={handleBuyPass}
+          disabled={loading}
         >
-          <ThemedText
-            style={{ color: "#FFF", fontWeight: "bold", fontSize: 18 }}
-          >
-            Buy Pass Now
-          </ThemedText>
+          {loading ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <ThemedText style={styles.buyText}>Buy Pass Now</ThemedText>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </ThemedScreen>
   );
 }
 
+/* ================= STYLES ================= */
 const styles = StyleSheet.create({
-  container: { paddingBottom: 40 },
+  container: {
+    paddingBottom: 40,
+  },
+
   hero: {
     alignItems: "center",
-    padding: 30,
-    borderRadius: 20,
-    marginBottom: 30,
+    padding: 28,
+    borderRadius: 24,
+    marginBottom: 32,
   },
-  features: { marginBottom: 30, paddingHorizontal: 10, gap: 15 },
-  featureRow: { flexDirection: "row", alignItems: "center" },
+  heroIcon: {
+    backgroundColor: "rgba(255,255,255,0.15)",
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+  heroTitle: {
+    color: "#FFF",
+    fontSize: 26,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  heroSubtitle: {
+    color: "rgba(255,255,255,0.85)",
+    textAlign: "center",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+
+  features: {
+    marginBottom: 32,
+    paddingHorizontal: 12,
+    gap: 14,
+  },
+  featureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  featureText: {
+    marginLeft: 10,
+    fontSize: 15,
+    fontWeight: "500",
+  },
+
   planCard: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 20,
-    borderRadius: 16,
+    padding: 22,
+    borderRadius: 18,
     borderWidth: 2,
-    marginBottom: 20,
-    backgroundColor: "rgba(255, 159, 28, 0.05)",
+    marginBottom: 26,
   },
+  planTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  strikePrice: {
+    textDecorationLine: "line-through",
+    marginTop: 4,
+  },
+  priceRight: {
+    alignItems: "flex-end",
+  },
+  finalPrice: {
+    fontSize: 24,
+    fontWeight: "800",
+  },
+  discountBadge: {
+    marginTop: 4,
+    backgroundColor: "#DCFCE7",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  discountText: {
+    fontSize: 11,
+    color: "#166534",
+    fontWeight: "800",
+  },
+
   buyBtn: {
-    height: 55,
-    borderRadius: 16,
+    height: 56,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    elevation: 6,
+  },
+  buyText: {
+    color: "#FFF",
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: 0.4,
   },
 });

@@ -1,20 +1,66 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
-    Image,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import { useTheme } from "../../context/ThemeContext";
+import { getMe, logoutUser } from "../../src/api/auth.api";
 import { ThemedScreen } from "../../src/components/ThemedScreen";
 import { ThemedText } from "../../src/components/ThemedText";
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { activeColors, toggleTheme, isDark } = useTheme();
+
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  /* ================= LOAD USER ================= */
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      setLoading(true);
+      const res = await getMe();
+      setUser(res);
+    } catch (err) {
+      Alert.alert("Error", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ================= LOGOUT ================= */
+  const handleLogout = () => {
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await logoutUser();
+          } catch (_) {
+            // ignore API failure
+          } finally {
+            await AsyncStorage.multiRemove(["accessToken", "refreshToken"]);
+            router.replace("/(auth)/login");
+          }
+        },
+      },
+    ]);
+  };
 
   const MenuItem = ({ icon, label, onPress, isDestructive }) => (
     <TouchableOpacity style={styles.menuItem} onPress={onPress}>
@@ -42,20 +88,37 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
+  /* ================= LOADING ================= */
+  if (loading) {
+    return (
+      <ThemedScreen>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={activeColors.primary} />
+        </View>
+      </ThemedScreen>
+    );
+  }
+
   return (
     <ThemedScreen edges={["left", "right", "bottom"]}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* User Info */}
+        {/* USER INFO */}
         <View style={styles.userSection}>
           <Image
-            source={{ uri: "https://i.pravatar.cc/150?img=12" }}
+            source={{
+              uri:
+                user?.avatar ||
+                "https://ui-avatars.com/api/?name=User&background=007ACC&color=fff",
+            }}
             style={styles.avatar}
           />
-          <ThemedText style={styles.userName}>John Doe</ThemedText>
-          <ThemedText variant="caption">+91 98765 43210</ThemedText>
+          <ThemedText style={styles.userName}>
+            {user?.name || "Student"}
+          </ThemedText>
+          <ThemedText variant="caption">{user?.phoneNumber}</ThemedText>
         </View>
 
-        {/* Menu */}
+        {/* MENU */}
         <View
           style={[
             styles.menuContainer,
@@ -86,7 +149,7 @@ export default function ProfileScreen() {
             icon="log-out-outline"
             label="Logout"
             isDestructive
-            onPress={() => router.replace("/(auth)/login")}
+            onPress={handleLogout}
           />
         </View>
       </ScrollView>
@@ -94,11 +157,28 @@ export default function ProfileScreen() {
   );
 }
 
+/* ================= STYLES ================= */
 const styles = StyleSheet.create({
-  userSection: { alignItems: "center", marginBottom: 30, marginTop: 10 },
-  avatar: { width: 100, height: 100, borderRadius: 50, marginBottom: 15 },
-  userName: { fontSize: 22, fontWeight: "bold", marginBottom: 5 },
-  menuContainer: { borderRadius: 16, padding: 10 },
+  userSection: {
+    alignItems: "center",
+    marginBottom: 30,
+    marginTop: 10,
+  },
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 15,
+  },
+  userName: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 5,
+  },
+  menuContainer: {
+    borderRadius: 16,
+    padding: 10,
+  },
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -112,5 +192,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+  },
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

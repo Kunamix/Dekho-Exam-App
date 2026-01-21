@@ -1,10 +1,12 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Dimensions,
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -14,241 +16,265 @@ import {
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  useColorScheme,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Colors } from "../../src/constants/Colors";
 
-const { width, height } = Dimensions.get("window");
+import { sendOtp } from "../../src/api/auth.api";
+
+const { width } = Dimensions.get("window");
+const PRIMARY_COLOR = "#378cf4"; // The specific orange from your image
 
 export default function LoginScreen() {
   const router = useRouter();
-  const scheme = useColorScheme() ?? "light";
-  const theme = Colors[scheme];
   const [phone, setPhone] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleGetOTP = () => {
+  const handleGetOTP = async () => {
     Keyboard.dismiss();
-    if (phone.length === 10) {
-      router.push({ pathname: "/(auth)/otp", params: { phone } });
-    } else {
-      alert("Please enter a valid 10-digit number");
+    if (phone.length !== 10) {
+      Alert.alert("Invalid Number", "Please enter a valid 10-digit number");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await sendOtp(phone);
+
+      if (response && response.success) {
+        const { verificationToken, phoneNumber } = response.data;
+        await AsyncStorage.setItem("verificationToken", verificationToken);
+        await AsyncStorage.setItem("authPhone", phoneNumber);
+
+        router.push({
+          pathname: "/(auth)/otp",
+          params: { phone: phoneNumber },
+        });
+      } else {
+        throw new Error(response.message || "Failed");
+      }
+    } catch (err) {
+      Alert.alert("Failed", err.message || "Something went wrong");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.primary }]}
-    >
-      <StatusBar style="light" />
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={styles.container}>
+        <StatusBar style="light" />
 
-      {/* ================= TOP SECTION ================= */}
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.topSection}>
-          <Text style={styles.brandText}>Dekho Exam</Text>
+        {/* Background Decor */}
+        <View style={styles.bgCircle1} />
+        <View style={styles.bgCircle2} />
 
-          <Image
-            source={require("../../assets/images/desk.png")}
-            style={styles.illustration}
-            resizeMode="contain"
-          />
-        </View>
-      </TouchableWithoutFeedback>
-
-      {/* ================= BOTTOM SHEET ================= */}
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <View style={[styles.sheet, { backgroundColor: theme.background }]}>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.sheetContent}
+        <SafeAreaView style={{ flex: 1 }}>
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
           >
-            <View style={[styles.handle, { backgroundColor: theme.border }]} />
-
-            <Text style={[styles.title, { color: theme.text }]}>
-              Welcome back
-            </Text>
-            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-              Enter your mobile number to continue
-            </Text>
-
-            <Text style={[styles.label, { color: theme.text }]}>
-              Mobile number
-            </Text>
-
-            <View style={styles.inputRow}>
-              <View
-                style={[
-                  styles.countryBox,
-                  {
-                    backgroundColor: theme.inputBg,
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <Text style={styles.flag}>🇮🇳</Text>
-                <Text style={[styles.countryText, { color: theme.text }]}>
-                  +91
-                </Text>
-                <Ionicons
-                  name="chevron-down"
-                  size={12}
-                  color={theme.textSecondary}
-                />
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+              {/* HEADER */}
+              <View style={styles.header}>
+                <TouchableOpacity
+                  onPress={() => router.back()}
+                  style={styles.backButton}
+                >
+                  {/* <Ionicons name="arrow-back" size={24} color="#FFF" /> */}
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Dekho Exam</Text>
+                <View style={{ width: 24 }} />
               </View>
 
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: theme.inputBg,
-                    color: theme.text,
-                    borderColor: theme.border,
-                  },
-                ]}
-                placeholder="98765 43210"
-                placeholderTextColor={theme.textSecondary}
-                keyboardType="number-pad"
-                maxLength={10}
-                value={phone}
-                onChangeText={setPhone}
-              />
-            </View>
+              {/* HERO ICON */}
+              <View style={styles.heroContainer}>
+                <MaterialCommunityIcons
+                  name="cellphone-message"
+                  size={80}
+                  color="#FFF"
+                />
+                <View style={styles.heroGlow} />
+              </View>
 
-            <TouchableOpacity
-              style={[
-                styles.button,
-                {
-                  backgroundColor: theme.secondary,
-                  shadowColor: theme.secondary,
-                },
-              ]}
-              onPress={handleGetOTP}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.buttonText}>Continue</Text>
-              <Ionicons
-                name="arrow-forward"
-                size={18}
-                color="#FFF"
-                style={{ marginLeft: 8 }}
-              />
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+              {/* WHITE CARD */}
+              <View style={styles.card}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Enter your mobile number</Text>
+
+                  <View style={styles.phoneInputContainer}>
+                    <Text style={styles.prefix}>+91</Text>
+                    <View style={styles.verticalLine} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="98765 43210"
+                      placeholderTextColor="#C4C4C4"
+                      keyboardType="number-pad"
+                      maxLength={10}
+                      value={phone}
+                      onChangeText={setPhone}
+                    />
+                  </View>
+                </View>
+
+                <Text style={styles.helperText}>
+                  We will send you a one time password (OTP)
+                </Text>
+                <Text style={styles.carrierText}>Carrier rates may apply</Text>
+
+                {/* FLOATING ACTION BUTTON */}
+                <View style={styles.fabContainer}>
+                  <TouchableOpacity
+                    style={styles.fab}
+                    onPress={handleGetOTP}
+                    disabled={loading}
+                    activeOpacity={0.8}
+                  >
+                    {loading ? (
+                      <ActivityIndicator color="#FFF" />
+                    ) : (
+                      <Ionicons name="arrow-forward" size={28} color="#FFF" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
 
-/* ================= STYLES ================= */
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-
-  /* ---------- TOP ---------- */
-  topSection: {
-    height: height * 0.42,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  brandText: {
-    position: "absolute",
-    top: 24,
-    left: 24,
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#FFF",
-    letterSpacing: 0.5,
-  },
-  illustration: {
-    width: width * 0.9,
-    height: height * 0.3,
-  },
-
-  /* ---------- SHEET ---------- */
-  sheet: {
+  container: {
     flex: 1,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+    backgroundColor: PRIMARY_COLOR,
+  },
+  /* Subtle Background Circles */
+  bgCircle1: {
+    position: "absolute",
+    top: -50,
+    left: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  bgCircle2: {
+    position: "absolute",
+    top: 100,
+    right: -30,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 16,
-    elevation: 30,
   },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 24,
-    opacity: 0.6,
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 40,
   },
-  sheetContent: {
-    paddingBottom: 32,
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#FFF",
   },
-
-  title: {
-    fontSize: 30,
-    fontWeight: "800",
-    marginBottom: 6,
+  heroContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 50,
   },
-  subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 28,
+  heroGlow: {
+    position: "absolute",
+    width: 60,
+    height: 10,
+    backgroundColor: "rgba(0,0,0,0.2)",
+    borderRadius: 50,
+    bottom: -10,
+    transform: [{ scaleX: 1.5 }],
+  },
+  /* Card Styles */
+  card: {
+    backgroundColor: "#FFF",
+    borderRadius: 24,
+    padding: 30,
+    paddingBottom: 50, // Space for the FAB
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
   },
   label: {
     fontSize: 14,
-    fontWeight: "700",
-    marginBottom: 10,
+    color: "#8A8A8A",
+    marginBottom: 16,
   },
-
-  /* ---------- INPUT ---------- */
-  inputRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 28,
-  },
-  countryBox: {
+  phoneInputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    height: 56,
-    borderWidth: 1,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+    paddingBottom: 8,
+    marginBottom: 24,
   },
-  flag: { fontSize: 20, marginRight: 6 },
-  countryText: { fontSize: 16, fontWeight: "700", marginRight: 4 },
-
+  prefix: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#333",
+  },
+  verticalLine: {
+    width: 1,
+    height: 20,
+    backgroundColor: "#E0E0E0",
+    marginHorizontal: 12,
+  },
   input: {
     flex: 1,
-    height: 56,
-    borderRadius: 16,
-    paddingHorizontal: 18,
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: "600",
-    borderWidth: 1,
+    color: "#333",
   },
-
-  /* ---------- BUTTON ---------- */
-  button: {
+  helperText: {
+    textAlign: "center",
+    color: "#666",
+    fontSize: 13,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  carrierText: {
+    textAlign: "center",
+    color: PRIMARY_COLOR,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  /* Floating Button */
+  fabContainer: {
+    position: "absolute",
+    bottom: -28, // Pulls the button halfway out of the card
+    alignSelf: "center",
+    borderRadius: 30,
+    backgroundColor: "#FFF", // White ring border effect
+    padding: 6,
+  },
+  fab: {
+    width: 56,
     height: 56,
-    borderRadius: 18,
-    flexDirection: "row",
+    borderRadius: 28,
+    backgroundColor: PRIMARY_COLOR,
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: PRIMARY_COLOR,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
     elevation: 8,
-  },
-  buttonText: {
-    color: "#FFF",
-    fontSize: 17,
-    fontWeight: "700",
-    letterSpacing: 0.4,
   },
 });

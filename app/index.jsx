@@ -70,7 +70,7 @@ export default function OnboardingScreen() {
   const checkOnboardingStatus = async () => {
     try {
       const hasLaunched = await AsyncStorage.getItem("hasLaunched");
-      if (hasLaunched === "false") {
+      if (hasLaunched === "true") {
         // Change to "true" for production logic
         router.replace("/(auth)/login");
       } else {

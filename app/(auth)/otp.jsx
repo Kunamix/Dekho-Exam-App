@@ -1,12 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Device from "expo-device";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -20,8 +18,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { sendOtp, verifyOtp } from "../../src/api/auth.api";
+// 1. Import Custom Hooks
 import { Colors } from "../../src/constants/Colors";
+import { useLogin, useVerifyOtp } from "../../src/hooks/useStudentActions";
 
 const OTP_LENGTH = 6;
 
@@ -31,11 +30,16 @@ export default function OTPScreen() {
   const scheme = useColorScheme() ?? "light";
   const theme = Colors[scheme];
 
+  // 2. Initialize Hooks
+  const { verify, loading: verifying } = useVerifyOtp();
+  const { login: resendOtp, loading: resending } = useLogin(); // Reusing login logic for resend
+
   const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(""));
-  const inputs = useRef([]);
+  const inputs = (useRef < Array < TextInput) | (null >> []);
   const [timer, setTimer] = useState(30);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const loading = verifying || resending;
 
   /* ================= TIMER ================= */
   useEffect(() => {
@@ -84,58 +88,42 @@ export default function OTPScreen() {
     }
 
     try {
-      setLoading(true);
       setError("");
 
-      const verificationToken = await AsyncStorage.getItem("verificationToken");
+      // 3. Call Hook
+      const response = await verify(phone, code);
 
-      if (!verificationToken) {
-        throw "Session expired. Please request OTP again.";
+      if (response) {
+        // 🔐 Save tokens (Response structure depends on your backend)
+        // Assuming response contains { accessToken, refreshToken }
+        await AsyncStorage.multiSet([
+          ["accessToken", response.accessToken],
+          ["refreshToken", response.refreshToken],
+        ]);
+
+        // ✅ Go to app
+        router.replace("/(tabs)");
       }
-
-      const deviceId =
-        Device.osInternalBuildId || Device.deviceName || "unknown-device";
-
-      const res = await verifyOtp(code, verificationToken, deviceId);
-
-      // 🔐 Save tokens from backend
-      await AsyncStorage.multiSet([
-        ["accessToken", res.accessToken],
-        ["refreshToken", res.refreshToken],
-      ]);
-
-      // ✅ Go to app
-      router.replace("/(tabs)");
     } catch (err) {
-      const msg = typeof err === "string" ? err : "Verification failed";
-      setError(msg);
-      Alert.alert("Verification Failed", msg);
-    } finally {
-      setLoading(false);
+      // Hook handles alert, we handle UI error state
+      setError("Invalid OTP. Please try again.");
+      setOtp(Array(OTP_LENGTH).fill("")); // Clear inputs on error
+      inputs.current[0]?.focus();
     }
   };
 
   /* ================= RESEND OTP ================= */
   const handleResend = async () => {
     try {
-      setLoading(true);
       setError("");
-
-      const res = await sendOtp(phone);
-
-      // 🔐 Update verification token
-      await AsyncStorage.setItem("verificationToken", res.verificationToken);
+      // 4. Call Hook
+      await resendOtp(phone);
 
       setOtp(Array(OTP_LENGTH).fill(""));
       inputs.current[0]?.focus();
       setTimer(30);
-
-      Alert.alert("OTP Sent", "A new OTP has been sent.");
     } catch (err) {
-      const msg = typeof err === "string" ? err : "Could not resend OTP";
-      Alert.alert("Failed", msg);
-    } finally {
-      setLoading(false);
+      console.log("Resend failed");
     }
   };
 
@@ -191,6 +179,7 @@ export default function OTPScreen() {
                   keyboardType="number-pad"
                   maxLength={1}
                   textAlign="center"
+                  editable={!loading}
                   style={[
                     styles.otpBox,
                     {
@@ -260,7 +249,7 @@ export default function OTPScreen() {
   );
 }
 
-/* ================= STYLES (UNCHANGED) ================= */
+/* ================= STYLES ================= */
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingHorizontal: 24, paddingVertical: 10 },

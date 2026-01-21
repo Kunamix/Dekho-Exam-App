@@ -12,6 +12,8 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
     "app/_layout.jsx",
-    "app/index.jsx"
+    "app/index.jsx",
+    "services/student.service.js",
+    "services/payment.service.js"
   ]
 }

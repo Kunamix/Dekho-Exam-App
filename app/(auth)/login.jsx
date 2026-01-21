@@ -20,43 +20,46 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { sendOtp } from "../../src/api/auth.api";
+// Import your custom hook
+import { useLogin } from "../../src/hooks/useStudentActions";
 
 const { width } = Dimensions.get("window");
-const PRIMARY_COLOR = "#378cf4"; // The specific orange from your image
+const PRIMARY_COLOR = "#378cf4";
 
 export default function LoginScreen() {
   const router = useRouter();
   const [phone, setPhone] = useState("");
-  const [loading, setLoading] = useState(false);
+
+  // Use the hook instead of local state for loading
+  const { login, loading } = useLogin();
 
   const handleGetOTP = async () => {
     Keyboard.dismiss();
+
+    // Basic Validation
     if (phone.length !== 10) {
       Alert.alert("Invalid Number", "Please enter a valid 10-digit number");
       return;
     }
 
     try {
-      setLoading(true);
-      const response = await sendOtp(phone);
+      // The hook handles the API call and basic error alerting
+      const response = await login(phone);
 
       if (response && response.success) {
-        const { verificationToken, phoneNumber } = response.data;
-        await AsyncStorage.setItem("verificationToken", verificationToken);
-        await AsyncStorage.setItem("authPhone", phoneNumber);
+        // Save temporary auth state if needed (though usually done after OTP verify)
+        // Storing phone to pre-fill or retry on next screen is good practice
+        await AsyncStorage.setItem("authPhone", phone);
 
+        // Navigate to OTP screen
         router.push({
           pathname: "/(auth)/otp",
-          params: { phone: phoneNumber },
+          params: { phone: phone },
         });
-      } else {
-        throw new Error(response.message || "Failed");
       }
     } catch (err) {
-      Alert.alert("Failed", err.message || "Something went wrong");
-    } finally {
-      setLoading(false);
+      // Hook already alerts errors, but you can add custom logic here if needed
+      console.log("Login flow interrupted", err);
     }
   };
 
@@ -81,7 +84,7 @@ export default function LoginScreen() {
                   onPress={() => router.back()}
                   style={styles.backButton}
                 >
-                  {/* <Ionicons name="arrow-back" size={24} color="#FFF" /> */}
+                  <Ionicons name="arrow-back" size={24} color="#FFF" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Dekho Exam</Text>
                 <View style={{ width: 24 }} />
@@ -113,6 +116,7 @@ export default function LoginScreen() {
                       maxLength={10}
                       value={phone}
                       onChangeText={setPhone}
+                      editable={!loading} // Disable input while loading
                     />
                   </View>
                 </View>
@@ -125,7 +129,7 @@ export default function LoginScreen() {
                 {/* FLOATING ACTION BUTTON */}
                 <View style={styles.fabContainer}>
                   <TouchableOpacity
-                    style={styles.fab}
+                    style={[styles.fab, loading && { opacity: 0.8 }]}
                     onPress={handleGetOTP}
                     disabled={loading}
                     activeOpacity={0.8}
@@ -186,6 +190,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#FFF",
   },
+  backButton: {
+    padding: 8,
+  },
   heroContainer: {
     alignItems: "center",
     justifyContent: "center",
@@ -211,6 +218,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 20,
     elevation: 10,
+  },
+  inputGroup: {
+    marginBottom: 8,
   },
   label: {
     fontSize: 14,

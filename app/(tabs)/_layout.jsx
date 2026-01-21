@@ -1,7 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs, useRouter } from "expo-router";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-// 1. Import SafeAreaInsets
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -9,9 +8,25 @@ import {
 
 import { useTheme } from "../../context/ThemeContext";
 
+// --- Helper to get Initials ---
+const getInitials = (name) => {
+  if (!name) return "U";
+  const parts = name.split(" ");
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+};
+
 const CustomHeader = () => {
   const router = useRouter();
   const { isDark, toggleTheme, activeColors } = useTheme();
+
+  // 1. Mock User Data (Replace this with real data from your Auth Context later)
+  const user = {
+    name: "Student User",
+    // avatar: null // If avatar is null, we show initials
+  };
 
   return (
     <SafeAreaView
@@ -54,10 +69,17 @@ const CustomHeader = () => {
             onPress={() => router.push("/(tabs)/profile")}
             style={styles.profileBtn}
           >
-            <Image
-              source={{ uri: "https://i.pravatar.cc/150?img=12" }}
-              style={styles.avatar}
-            />
+            {/* 2. Conditionally Render Image or Text Avatar */}
+            <View
+              style={[
+                styles.avatarContainer,
+                { backgroundColor: activeColors.primary }, // Background color for text avatar
+              ]}
+            >
+              <Text style={styles.avatarText}>{getInitials(user.name)}</Text>
+            </View>
+
+            {/* Status Dot */}
             <View
               style={[
                 styles.statusDot,
@@ -76,8 +98,6 @@ const CustomHeader = () => {
 
 export default function TabLayout() {
   const { activeColors } = useTheme();
-
-  // 2. Get safe area insets (bottom is crucial here)
   const insets = useSafeAreaInsets();
 
   return (
@@ -92,14 +112,8 @@ export default function TabLayout() {
           backgroundColor: activeColors.background,
           borderTopColor: activeColors.border,
           borderTopWidth: 1,
-
-          // 3. DYNAMIC HEIGHT & PADDING CALCULATION
-          // Base height (60) + Safe Area Bottom Inset
           height: 60 + (insets.bottom > 0 ? insets.bottom : 10),
-
-          // Padding bottom matches the inset (or defaults to 10px)
           paddingBottom: insets.bottom > 0 ? insets.bottom : 10,
-
           paddingTop: 8,
           elevation: 10,
           shadowColor: "#000",
@@ -193,15 +207,6 @@ export default function TabLayout() {
           ),
         }}
       />
-
-      {/* <Tabs.Screen
-        name="testRunner"
-        options={{ href: null, header: () => null }}
-      /> */}
-      {/* <Tabs.Screen
-        name="testResult"
-        options={{ href: null, header: () => null }}
-      /> */}
     </Tabs>
   );
 }
@@ -243,12 +248,21 @@ const styles = StyleSheet.create({
   profileBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: "transparent",
     position: "relative",
   },
-  avatar: { width: "100%", height: "100%", borderRadius: 20 },
+  /* 3. New Avatar Styles */
+  avatarContainer: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarText: {
+    color: "#FFF",
+    fontSize: 14,
+    fontWeight: "800",
+  },
   statusDot: {
     width: 12,
     height: 12,

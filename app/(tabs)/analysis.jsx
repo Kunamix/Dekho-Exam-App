@@ -1,41 +1,46 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router"; // Import Router
-import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { useRouter } from "expo-router";
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 import { useTheme } from "../../context/ThemeContext";
 import { ThemedScreen } from "../../src/components/ThemedScreen";
 import { ThemedText } from "../../src/components/ThemedText";
 
-// Mock Data for History
-const RECENT_ATTEMPTS = [
-  {
-    id: "1",
-    title: "SSC CGL Tier I - Full Mock",
-    score: "85/100",
-    accuracy: "90%",
-    date: "2 Oct, 2023",
-  },
-  {
-    id: "2",
-    title: "SBI PO Prelims Mock 3",
-    score: "62/100",
-    accuracy: "75%",
-    date: "1 Oct, 2023",
-  },
-  {
-    id: "3",
-    title: "RRB NTPC Gen. Awareness",
-    score: "40/50",
-    accuracy: "88%",
-    date: "28 Sep, 2023",
-  },
-];
+// Import Custom Hook
+import { useTestHistory } from "../../src/hooks/useStudentData";
 
 export default function AnalysisScreen() {
-  const router = useRouter(); // Initialize Router
+  const router = useRouter();
   const { activeColors, isDark } = useTheme();
 
-  // 1. Stat Box Component
+  // 1. Fetch Real Data
+  const { data: history = [], loading, refetch } = useTestHistory();
+
+  // 2. Calculate Stats from History
+  const totalTests = history.length;
+  const avgScore =
+    totalTests > 0
+      ? Math.round(
+          history.reduce((acc, curr) => acc + (curr.percentage || 0), 0) /
+            totalTests,
+        )
+      : 0;
+  const avgAccuracy =
+    totalTests > 0
+      ? Math.round(
+          history.reduce((acc, curr) => acc + (curr.accuracy || 0), 0) /
+            totalTests,
+        )
+      : 0;
+
+  // 3. Stat Box Component
   const StatBox = ({ label, value, icon, color }) => (
     <View
       style={[
@@ -58,7 +63,7 @@ export default function AnalysisScreen() {
     </View>
   );
 
-  // 2. History Item Component
+  // 4. History Item Component
   const AttemptCard = ({ item }) => (
     <View
       style={[
@@ -72,8 +77,16 @@ export default function AnalysisScreen() {
       {/* Test Title & Date */}
       <View style={styles.historyHeader}>
         <View style={{ flex: 1 }}>
-          <ThemedText style={styles.historyTitle}>{item.title}</ThemedText>
-          <ThemedText variant="caption">{item.date}</ThemedText>
+          <ThemedText style={styles.historyTitle} numberOfLines={1}>
+            {item.testName}
+          </ThemedText>
+          <ThemedText variant="caption">
+            {new Date(item.submittedAt).toLocaleDateString("en-IN", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })}
+          </ThemedText>
         </View>
         <View
           style={[styles.scoreBadge, { backgroundColor: activeColors.inputBg }]}
@@ -81,26 +94,28 @@ export default function AnalysisScreen() {
           <ThemedText
             style={{ fontWeight: "bold", color: activeColors.primary }}
           >
-            {item.score}
+            {item.percentage}%
           </ThemedText>
         </View>
       </View>
 
-      <View style={styles.divider} />
+      <View
+        style={[styles.divider, { backgroundColor: activeColors.border }]}
+      />
 
       {/* Footer Actions */}
       <View style={styles.historyFooter}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <Ionicons name="disc" size={16} color={activeColors.success} />
           <ThemedText variant="caption" style={{ marginLeft: 5 }}>
-            Acc: {item.accuracy}
+            Acc: {item.accuracy}%
           </ThemedText>
         </View>
 
         {/* VIEW SOLUTIONS BUTTON */}
         <TouchableOpacity
           style={[styles.solutionBtn, { borderColor: activeColors.secondary }]}
-          onPress={() => router.push(`/solutions/${item.id}`)} // Navigate to Solutions
+          onPress={() => router.push(`/solutions/${item.attemptId}`)}
         >
           <ThemedText
             style={{
@@ -126,6 +141,9 @@ export default function AnalysisScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={refetch} />
+        }
       >
         <ThemedText variant="title" style={{ marginBottom: 20 }}>
           Your Performance
@@ -135,21 +153,26 @@ export default function AnalysisScreen() {
         <View style={styles.grid}>
           <StatBox
             label="Tests Taken"
-            value="42"
+            value={totalTests.toString()}
             icon="document-text"
             color="#3B82F6"
           />
           <StatBox
             label="Avg Score"
-            value="78%"
+            value={`${avgScore}%`}
             icon="trophy"
             color="#F59E0B"
           />
-          <StatBox label="Accuracy" value="85%" icon="disc" color="#10B981" />
-          <StatBox label="Time/Ques" value="45s" icon="time" color="#EF4444" />
+          <StatBox
+            label="Accuracy"
+            value={`${avgAccuracy}%`}
+            icon="disc"
+            color="#10B981"
+          />
+          <StatBox label="Best Rank" value="#1" icon="ribbon" color="#EF4444" />
         </View>
 
-        {/* Weekly Chart */}
+        {/* Weekly Chart (Static for now, dynamic logic is complex without a library) */}
         <View
           style={[
             styles.chartCard,
@@ -157,23 +180,25 @@ export default function AnalysisScreen() {
           ]}
         >
           <ThemedText variant="subtitle" style={{ marginBottom: 15 }}>
-            Weekly Progress
+            Last 7 Attempts
           </ThemedText>
           <View style={styles.chartArea}>
-            {[40, 60, 35, 80, 55, 90, 70].map((h, i) => (
+            {/* Map last 7 history items or fill with dummy if empty */}
+            {(history.length > 0
+              ? history.slice(0, 7)
+              : [0, 0, 0, 0, 0, 0, 0]
+            ).map((h, i) => (
               <View key={i} style={styles.barContainer}>
                 <View
                   style={[
                     styles.bar,
                     {
-                      height: `${h}%`,
+                      height: `${typeof h === "number" ? h : h.percentage || 10}%`, // Safe height
                       backgroundColor: activeColors.secondary,
+                      opacity: typeof h === "number" ? 0.3 : 1,
                     },
                   ]}
                 />
-                <ThemedText variant="caption" style={{ marginTop: 5 }}>
-                  {["M", "T", "W", "T", "F", "S", "S"][i]}
-                </ThemedText>
               </View>
             ))}
           </View>
@@ -182,16 +207,25 @@ export default function AnalysisScreen() {
         {/* Recent Attempts Section */}
         <View style={styles.sectionHeader}>
           <ThemedText variant="subtitle">Recent Attempts</ThemedText>
-          <TouchableOpacity onPress={() => router.push("/history")}>
-            <ThemedText variant="link">View All</ThemedText>
-          </TouchableOpacity>
         </View>
 
-        <View style={styles.historyList}>
-          {RECENT_ATTEMPTS.map((attempt) => (
-            <AttemptCard key={attempt.id} item={attempt} />
-          ))}
-        </View>
+        {loading && history.length === 0 ? (
+          <ActivityIndicator size="small" color={activeColors.primary} />
+        ) : (
+          <View style={styles.historyList}>
+            {history.length === 0 ? (
+              <ThemedText
+                style={{ textAlign: "center", marginTop: 20, opacity: 0.5 }}
+              >
+                No tests attempted yet.
+              </ThemedText>
+            ) : (
+              history.map((attempt) => (
+                <AttemptCard key={attempt.attemptId} item={attempt} />
+              ))
+            )}
+          </View>
+        )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -227,8 +261,13 @@ const styles = StyleSheet.create({
     height: 150,
     alignItems: "flex-end",
   },
-  barContainer: { alignItems: "center", width: 20 },
-  bar: { width: 8, borderRadius: 4 },
+  barContainer: {
+    alignItems: "center",
+    width: 20,
+    height: "100%",
+    justifyContent: "flex-end",
+  },
+  bar: { width: 8, borderRadius: 4, minHeight: 4 },
 
   // History Section
   sectionHeader: {
@@ -251,7 +290,6 @@ const styles = StyleSheet.create({
   scoreBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   divider: {
     height: 1,
-    backgroundColor: "#E5E7EB",
     marginVertical: 10,
     opacity: 0.5,
   },

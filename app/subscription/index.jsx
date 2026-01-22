@@ -15,7 +15,7 @@ import { ThemedScreen } from "../../src/components/ThemedScreen";
 import { ThemedText } from "../../src/components/ThemedText";
 
 // Import the Service
-import { startPayment } from "../../services/paymentService";
+import { startPayment } from "../../services/payment.service";
 
 export default function SubscriptionScreen() {
   const router = useRouter();

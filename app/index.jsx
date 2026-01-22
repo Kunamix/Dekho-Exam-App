@@ -17,7 +17,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// --- BRAND COLORS ---
+/* ================= BRAND COLORS ================= */
 const COLORS = {
   bg: "#FFFFFF",
   primary: "#007ACC",
@@ -26,6 +26,7 @@ const COLORS = {
   subText: "#6B7280",
 };
 
+/* ================= SLIDES ================= */
 const SLIDES = [
   {
     id: "1",
@@ -52,36 +53,48 @@ const SLIDES = [
 
 export default function OnboardingScreen() {
   const router = useRouter();
-  const { width, height } = useWindowDimensions();
-  const flatListRef = useRef(null);
-  const scrollX = useRef(new Animated.Value(0)).current;
+  const { width } = useWindowDimensions();
 
-  // Floating Animation Value
+  const flatListRef = useRef < FlatList > null;
+  const scrollX = useRef(new Animated.Value(0)).current;
   const floatAnim = useRef(new Animated.Value(0)).current;
 
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  /* ================= INITIAL CHECK ================= */
   useEffect(() => {
-    checkOnboardingStatus();
+    bootstrap();
     startFloatingAnimation();
   }, []);
 
-  const checkOnboardingStatus = async () => {
+  const bootstrap = async () => {
     try {
-      const hasLaunched = await AsyncStorage.getItem("hasLaunched");
-      if (hasLaunched === "true") {
-        // Change to "true" for production logic
-        router.replace("/(auth)/login");
-      } else {
-        setLoading(false);
+      const [hasLaunched, accessToken] = await Promise.all([
+        AsyncStorage.getItem("hasLaunched"),
+        AsyncStorage.getItem("accessToken"),
+      ]);
+
+      // ✅ Logged in → skip onboarding
+      if (accessToken) {
+        router.replace("/(tabs)");
+        return;
       }
-    } catch (error) {
+
+      // ✅ Onboarding done but not logged in
+      if (hasLaunched === "true") {
+        router.replace("/(auth)/login");
+        return;
+      }
+
+      // ❌ First launch → show onboarding
+      setLoading(false);
+    } catch {
       setLoading(false);
     }
   };
 
-  // --- 1. Floating Animation Logic ---
+  /* ================= FLOATING IMAGE ================= */
   const startFloatingAnimation = () => {
     Animated.loop(
       Animated.sequence([
@@ -101,22 +114,20 @@ export default function OnboardingScreen() {
     ).start();
   };
 
-  // Interpolate floating value to pixels (Up/Down movement)
   const translateY = floatAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -15], // Moves up 15px then down
+    outputRange: [0, -15],
   });
 
+  /* ================= NEXT HANDLER ================= */
   const handleNext = async () => {
     if (currentIndex < SLIDES.length - 1) {
-      flatListRef.current.scrollToIndex({ index: currentIndex + 1 });
+      flatListRef.current?.scrollToIndex({
+        index: currentIndex + 1,
+      });
     } else {
-      try {
-        await AsyncStorage.setItem("hasLaunched", "true");
-        router.replace("/(auth)/login");
-      } catch (error) {
-        console.log("Error", error);
-      }
+      await AsyncStorage.setItem("hasLaunched", "true");
+      router.replace("/(auth)/login");
     }
   };
 
@@ -126,9 +137,8 @@ export default function OnboardingScreen() {
     }
   }).current;
 
-  // --- 2. Parallax Background Component ---
+  /* ================= BACKGROUND PATH ================= */
   const BackgroundPath = () => {
-    // We animate the path's rotation and position based on scrollX
     const rotate = scrollX.interpolate({
       inputRange: [0, width, width * 2],
       outputRange: ["-25deg", "0deg", "-35deg"],
@@ -136,12 +146,12 @@ export default function OnboardingScreen() {
 
     const translateX = scrollX.interpolate({
       inputRange: [0, width, width * 2],
-      outputRange: [0, -50, -100], // Moves slightly left as you swipe right
+      outputRange: [0, -50, -100],
     });
 
     const scale = scrollX.interpolate({
       inputRange: [0, width, width * 2],
-      outputRange: [1, 1.2, 1], // Pulses bigger in the middle
+      outputRange: [1, 1.2, 1],
     });
 
     return (
@@ -149,7 +159,7 @@ export default function OnboardingScreen() {
         style={[
           styles.pathBase,
           {
-            width: width * 1.5, // Wider than screen for parallax
+            width: width * 1.5,
             transform: [{ rotate }, { translateX }, { scale }],
           },
         ]}
@@ -157,8 +167,8 @@ export default function OnboardingScreen() {
     );
   };
 
+  /* ================= SLIDE ================= */
   const Slide = ({ item, index }) => {
-    // Parallax Logic for Text Entrance
     const inputRange = [
       (index - 1) * width,
       index * width,
@@ -167,17 +177,16 @@ export default function OnboardingScreen() {
 
     const textTranslateY = scrollX.interpolate({
       inputRange,
-      outputRange: [50, 0, 50], // Text comes up from bottom
+      outputRange: [50, 0, 50],
     });
 
     const opacity = scrollX.interpolate({
       inputRange,
-      outputRange: [0, 1, 0], // Fades in and out
+      outputRange: [0, 1, 0],
     });
 
     return (
       <View style={[styles.slide, { width }]}>
-        {/* Character Image with Float Animation */}
         <Animated.View
           style={[styles.imageContainer, { transform: [{ translateY }] }]}
         >
@@ -188,7 +197,6 @@ export default function OnboardingScreen() {
           />
         </Animated.View>
 
-        {/* Text Content with Scroll Animation */}
         <Animated.View
           style={[
             styles.textContainer,
@@ -202,19 +210,20 @@ export default function OnboardingScreen() {
     );
   };
 
+  /* ================= LOADING ================= */
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View style={styles.loader}>
         <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }
 
+  /* ================= UI ================= */
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
-      {/* Shared Background Path (Behind FlatList) */}
       <View style={StyleSheet.absoluteFillObject}>
         <View style={styles.pathContainer}>
           <BackgroundPath />
@@ -235,49 +244,29 @@ export default function OnboardingScreen() {
         )}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
-        scrollEventThrottle={16} // Smooth animation updates
+        scrollEventThrottle={16}
       />
 
-      {/* Bottom Footer Area */}
       <View style={styles.footer}>
-        {/* Animated Progress Dots */}
         <View style={styles.paginator}>
           {SLIDES.map((_, i) => {
             const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
             const dotWidth = scrollX.interpolate({
               inputRange,
-              outputRange: [10, 25, 10], // Active dot gets wider
-              extrapolate: "clamp",
-            });
-            const dotColor = scrollX.interpolate({
-              inputRange,
-              outputRange: ["#D1D5DB", COLORS.accent, "#D1D5DB"],
+              outputRange: [10, 25, 10],
               extrapolate: "clamp",
             });
 
             return (
               <Animated.View
                 key={i}
-                style={[
-                  styles.dot,
-                  { width: dotWidth, backgroundColor: dotColor },
-                ]}
+                style={[styles.dot, { width: dotWidth }]}
               />
             );
           })}
         </View>
 
-        <TouchableOpacity
-          style={[
-            styles.btn,
-            {
-              backgroundColor:
-                currentIndex === SLIDES.length - 1 ? COLORS.accent : "#111827",
-            },
-          ]}
-          onPress={handleNext}
-          activeOpacity={0.8}
-        >
+        <TouchableOpacity style={styles.btn} onPress={handleNext}>
           <Ionicons
             name={
               currentIndex === SLIDES.length - 1 ? "checkmark" : "arrow-forward"
@@ -291,103 +280,70 @@ export default function OnboardingScreen() {
   );
 }
 
+/* ================= STYLES ================= */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  slide: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  loader: { flex: 1, justifyContent: "center", alignItems: "center" },
+  slide: { flex: 1, alignItems: "center", justifyContent: "center" },
 
-  // --- The Orange Path Styles ---
   pathContainer: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
     zIndex: -1,
-    overflow: "hidden", // Prevent path from going outside screen
   },
   pathBase: {
-    height: 500, // Big Blob
+    height: 500,
     backgroundColor: COLORS.accent,
     borderRadius: 200,
-    position: "absolute",
-    top: "25%", // Center vertically approx
     opacity: 0.9,
   },
 
-  // --- Content Styles ---
   imageContainer: {
     flex: 0.9,
     justifyContent: "flex-end",
     width: "100%",
     alignItems: "center",
-    marginBottom: 20,
-    zIndex: 10,
   },
-  image: {
-    width: "100%", // Slightly bigger for better visual
-    height: "100%",
-  },
+  image: { width: "100%", height: "100%" },
+
   textContainer: {
     flex: 0.3,
     paddingHorizontal: 30,
     alignItems: "center",
-    zIndex: 10,
   },
   title: {
     fontSize: 32,
-    fontWeight: "900", // Extra bold
+    fontWeight: "900",
     textAlign: "center",
-    marginBottom: 10,
     color: COLORS.text,
-    lineHeight: 40,
-    letterSpacing: 0.5,
   },
   subtitle: {
     fontSize: 16,
     textAlign: "center",
     color: COLORS.subText,
-    lineHeight: 24,
-    fontWeight: "500",
   },
 
-  // --- Footer ---
   footer: {
-    height: 120, // Taller footer
+    height: 120,
+    flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    flexDirection: "row",
     paddingHorizontal: 30,
-    paddingBottom: 20,
   },
-  paginator: {
-    flexDirection: "row",
-    height: 40,
-    alignItems: "center",
-  },
+  paginator: { flexDirection: "row", alignItems: "center" },
   dot: {
     height: 10,
     borderRadius: 5,
     marginHorizontal: 5,
+    backgroundColor: COLORS.accent,
   },
   btn: {
     width: 64,
     height: 64,
-    borderRadius: 24, // Modern Squircle
+    borderRadius: 24,
+    backgroundColor: "#111827",
     justifyContent: "center",
     alignItems: "center",
-    elevation: 10,
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
   },
 });

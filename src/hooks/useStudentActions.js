@@ -2,9 +2,9 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Alert } from "react-native";
 import {
-    authService,
-    handleApiError,
-    testService,
+  authService,
+  handleApiError,
+  testService,
 } from "../../services/student.service";
 
 // --- AUTH HOOKS ---
@@ -17,6 +17,7 @@ export const useLogin = () => {
     try {
       setLoading(true);
       const res = await authService.login(phone);
+      console.log("Login response:", res);
       // Backend should return success message or OTP sent status
       return res;
     } catch (err) {
@@ -38,6 +39,7 @@ export const useVerifyOtp = () => {
     try {
       setLoading(true);
       const res = await authService.verifyOtp(phone, otp);
+      console.log("OTP Verification response:", res);
       // Handle Token Storage here (AsyncStorage) usually
       return res;
     } catch (err) {
@@ -50,6 +52,31 @@ export const useVerifyOtp = () => {
   };
 
   return { verify, loading };
+};
+
+export const useUpdateProfile = () => {
+  const [loading, setLoading] = useState(false);
+
+  const updateProfile = async (data, onSuccess) => {
+    try {
+      setLoading(true);
+
+      const res = await authService.updateProfile(data);
+      Alert.alert("Success", "Profile updated successfully!");
+
+      if (onSuccess) onSuccess();
+
+      return res;
+    } catch (err) {
+      const msg = handleApiError(err, "Failed to update profile");
+      Alert.alert("Error", msg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { updateProfile, loading };
 };
 
 // --- TEST ENGINE HOOKS ---

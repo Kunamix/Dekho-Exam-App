@@ -14,6 +14,7 @@
     "app/_layout.jsx",
     "app/index.jsx",
     "services/student.service.js",
-    "services/payment.service.js"
+    "services/payment.service.js",
+    "src/components/categories/CategoriesSection.jsx"
   ]
 }

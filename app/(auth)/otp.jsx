@@ -32,10 +32,13 @@ export default function OTPScreen() {
 
   // 2. Initialize Hooks
   const { verify, loading: verifying } = useVerifyOtp();
-  const { login: resendOtp, loading: resending } = useLogin(); // Reusing login logic for resend
+  const { login: resendOtp, loading: resending } = useLogin();
 
   const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(""));
-  const inputs = (useRef < Array < TextInput) | (null >> []);
+
+  // ✅ FIX: Initialize ref as an empty array
+  const inputs = useRef([]);
+
   const [timer, setTimer] = useState(30);
   const [error, setError] = useState("");
 
@@ -51,17 +54,34 @@ export default function OTPScreen() {
   /* ================= OTP INPUT ================= */
   const handleChange = (text, index) => {
     const digit = text.replace(/[^0-9]/g, "");
-    if (!digit) return;
+
+    // Handle paste or single digit
+    if (digit.length > 1) {
+      const newOtp = [...otp];
+      for (let i = 0; i < digit.length && index + i < OTP_LENGTH; i++) {
+        newOtp[index + i] = digit[i];
+      }
+      setOtp(newOtp);
+      const nextIndex = Math.min(index + digit.length, OTP_LENGTH - 1);
+      inputs.current[nextIndex]?.focus();
+      if (newOtp.join("").length === OTP_LENGTH) {
+        Keyboard.dismiss();
+        handleVerify(newOtp.join(""));
+      }
+      return;
+    }
 
     const updated = [...otp];
     updated[index] = digit;
     setOtp(updated);
     setError("");
 
-    if (index < OTP_LENGTH - 1) {
+    // Auto-focus next input
+    if (digit && index < OTP_LENGTH - 1) {
       inputs.current[index + 1]?.focus();
     }
 
+    // Auto-submit if full
     if (updated.join("").length === OTP_LENGTH) {
       Keyboard.dismiss();
       handleVerify(updated.join(""));
@@ -71,11 +91,15 @@ export default function OTPScreen() {
   const handleBackspace = (e, index) => {
     if (e.nativeEvent.key === "Backspace") {
       const updated = [...otp];
-      if (updated[index]) {
+      // If current box is empty, move back and delete prev
+      if (!updated[index] && index > 0) {
+        inputs.current[index - 1]?.focus();
+        updated[index - 1] = "";
+        setOtp(updated);
+      } else {
+        // Just clear current box
         updated[index] = "";
         setOtp(updated);
-      } else if (index > 0) {
-        inputs.current[index - 1]?.focus();
       }
     }
   };
@@ -89,25 +113,23 @@ export default function OTPScreen() {
 
     try {
       setError("");
-
-      // 3. Call Hook
-      const response = await verify(phone, code);
+      const response = await verify(code);
 
       if (response) {
-        // 🔐 Save tokens (Response structure depends on your backend)
-        // Assuming response contains { accessToken, refreshToken }
-        await AsyncStorage.multiSet([
-          ["accessToken", response.accessToken],
-          ["refreshToken", response.refreshToken],
-        ]);
+        // Save tokens
+        if (response.accessToken) {
+          await AsyncStorage.setItem("accessToken", response.accessToken);
+        }
+        if (response.refreshToken) {
+          await AsyncStorage.setItem("refreshToken", response.refreshToken);
+        }
 
-        // ✅ Go to app
+        // Navigate
         router.replace("/(tabs)");
       }
     } catch (err) {
-      // Hook handles alert, we handle UI error state
       setError("Invalid OTP. Please try again.");
-      setOtp(Array(OTP_LENGTH).fill("")); // Clear inputs on error
+      setOtp(Array(OTP_LENGTH).fill(""));
       inputs.current[0]?.focus();
     }
   };
@@ -116,9 +138,7 @@ export default function OTPScreen() {
   const handleResend = async () => {
     try {
       setError("");
-      // 4. Call Hook
       await resendOtp(phone);
-
       setOtp(Array(OTP_LENGTH).fill(""));
       inputs.current[0]?.focus();
       setTimer(30);
@@ -169,17 +189,19 @@ export default function OTPScreen() {
 
             {/* OTP INPUTS */}
             <View style={styles.otpRow}>
-              {otp.map((d, i) => (
+              {otp.map((digit, index) => (
                 <TextInput
-                  key={i}
-                  ref={(r) => (inputs.current[i] = r)}
-                  value={d}
-                  onChangeText={(t) => handleChange(t, i)}
-                  onKeyPress={(e) => handleBackspace(e, i)}
+                  key={index}
+                  // ✅ FIX: Assign ref directly to array index
+                  ref={(el) => (inputs.current[index] = el)}
+                  value={digit}
+                  onChangeText={(text) => handleChange(text, index)}
+                  onKeyPress={(e) => handleBackspace(e, index)}
                   keyboardType="number-pad"
-                  maxLength={1}
+                  maxLength={1} // Or 6 if handling paste logic differently
                   textAlign="center"
                   editable={!loading}
+                  selectTextOnFocus
                   style={[
                     styles.otpBox,
                     {
@@ -187,10 +209,10 @@ export default function OTPScreen() {
                       color: theme.text,
                       borderColor: error
                         ? "#EF4444"
-                        : d
+                        : digit
                           ? theme.primary
                           : "transparent",
-                      borderWidth: d || error ? 1.5 : 0,
+                      borderWidth: digit || error ? 1.5 : 0,
                     },
                   ]}
                 />
@@ -253,7 +275,14 @@ export default function OTPScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingHorizontal: 24, paddingVertical: 10 },
-  backBtn: { padding: 10, borderRadius: 12 },
+  backBtn: {
+    padding: 10,
+    borderRadius: 12,
+    width: 44,
+    height: 44,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   content: { flex: 1, paddingHorizontal: 24, paddingTop: 20 },
   titleContainer: { alignItems: "center", marginBottom: 40 },
   iconCircle: {
@@ -270,13 +299,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 24,
+    gap: 8,
   },
   otpBox: {
-    width: 50,
-    height: 58,
-    borderRadius: 14,
-    fontSize: 24,
-    fontWeight: "600",
+    width: 45,
+    height: 55,
+    borderRadius: 12,
+    fontSize: 22,
+    fontWeight: "700",
   },
   errorContainer: {
     flexDirection: "row",
@@ -294,6 +324,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   buttonText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
 });

@@ -2,7 +2,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useState } from "react";
 import { Alert } from "react-native";
 import RazorpayCheckout from "react-native-razorpay";
-import { createOrderApi, verifyPaymentApi } from "../services/payment.service";
+import {
+  createOrderApi,
+  verifyPaymentApi,
+} from "../../services/payment.service";
 
 export const usePayment = (onSuccess) => {
   const [loading, setLoading] = useState(false);
@@ -14,38 +17,70 @@ export const usePayment = (onSuccess) => {
         return;
       }
 
-      if (loading) return; // prevent double tap
+      if (loading) return;
 
       try {
         setLoading(true);
 
-        // 1️⃣ Prefill details
-        const phone = (await AsyncStorage.getItem("authPhone")) || "";
+        /* ================= USER PROFILE ================= */
+        const raw = await AsyncStorage.getItem("userProfile");
 
-        // 2️⃣ Create Order (Backend)
+        if (!raw) {
+          throw new Error("User not logged in");
+        }
+
+        let parsed;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          throw new Error("Corrupted user session");
+        }
+
+        // ✅ Normalize profile (critical fix)
+        const user = parsed?.data;
+
+        if (!user?.id) {
+          throw new Error("Invalid user session");
+        }
+
+        console.log("User Profile for Payment:", user);
+
+        /* ================= CREATE ORDER ================= */
         const orderData = await createOrderApi(plan.id);
+        // { orderId, amount, currency, key }
 
-        // 3️⃣ Razorpay Options
+        if (!orderData?.orderId || !orderData?.key) {
+          throw new Error("Failed to initialize payment");
+        }
+
+        /* ================= RAZORPAY OPTIONS ================= */
         const options = {
+          name: "DekhoExam",
           description: `Subscription for ${plan.name}`,
           image: "https://razorpay.com/assets/razorpay-glyph.svg",
+
           currency: orderData.currency,
-          key: orderData.key,
+          key: orderData.key, // ✅ FROM BACKEND ONLY
           amount: orderData.amount,
-          name: "DekhoExam",
           order_id: orderData.orderId,
+
           prefill: {
-            email: "student@dekhoexam.com",
-            contact: phone,
-            name: "Student",
+            name: user.name || "Student",
+            email: user.email || "",
+            contact: user.phoneNumber || "",
           },
+
           theme: { color: "#378cf4" },
         };
 
-        // 4️⃣ Open Razorpay Checkout
+        /* ================= OPEN CHECKOUT ================= */
         const paymentData = await RazorpayCheckout.open(options);
 
-        // 5️⃣ Verify Payment (Backend)
+        if (!paymentData?.razorpay_payment_id) {
+          throw new Error("Payment was not completed");
+        }
+
+        /* ================= VERIFY PAYMENT ================= */
         await verifyPaymentApi({
           razorpay_order_id: paymentData.razorpay_order_id,
           razorpay_payment_id: paymentData.razorpay_payment_id,
@@ -55,19 +90,19 @@ export const usePayment = (onSuccess) => {
         Alert.alert("Success 🎉", "Plan activated successfully!");
         onSuccess?.();
       } catch (error) {
-        // ❌ User cancelled payment
+        // ❌ User cancelled
         if (error?.description === "Payment Cancelled") {
           console.log("Payment cancelled by user");
           return;
         }
 
-        // ❌ Razorpay failure
+        // ❌ Razorpay error
         if (error?.error?.description) {
           Alert.alert("Payment Failed", error.error.description);
           return;
         }
 
-        // ❌ Backend / API error
+        // ❌ App / Backend error
         const message =
           error?.response?.data?.message ||
           error?.message ||

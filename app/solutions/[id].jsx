@@ -2,309 +2,284 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
-    FlatList,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
-// Components & Context
 import { useTheme } from "../../context/ThemeContext";
 import { ThemedScreen } from "../../src/components/ThemedScreen";
 import { ThemedText } from "../../src/components/ThemedText";
+import { useTestSolutions } from "../../src/hooks/useTestSolutions";
 
-// Mock Solution Data
-const MOCK_SOLUTIONS = [
-  {
-    id: 1,
-    question: "If A + B = 10 and A - B = 4, find the value of A * B.",
-    options: ["16", "21", "24", "20"],
-    correctOption: 1, // Index 1 -> "21"
-    userSelected: 1, // User chose Correct
-    explanation:
-      "Add both equations: 2A = 14 => A = 7. Put A in eq1: 7 + B = 10 => B = 3. Therefore A*B = 7*3 = 21.",
-  },
-  {
-    id: 2,
-    question: "Which number completes the series? 2, 5, 10, 17, ...",
-    options: ["24", "26", "25", "27"],
-    correctOption: 1, // Index 1 -> "26"
-    userSelected: 0, // User chose Wrong ("24")
-    explanation:
-      "The pattern is n^2 + 1. (1^2+1=2), (2^2+1=5)... so (5^2+1 = 26).",
-  },
-  {
-    id: 3,
-    question:
-      "A train running at 60km/hr crosses a pole in 9 seconds. What is the length of the train?",
-    options: ["120m", "150m", "180m", "324m"],
-    correctOption: 1, // Index 1 -> "150m"
-    userSelected: null, // User Skipped
-    explanation:
-      "Speed = 60*(5/18) = 50/3 m/s. Distance = Speed × Time = (50/3) * 9 = 150m.",
-  },
-];
-
-const FILTERS = ["All", "Incorrect", "Correct", "Skipped"];
+const FILTERS = ["All", "Correct", "Incorrect", "Skipped"];
 
 export default function SolutionsScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
-  const { activeColors, isDark } = useTheme();
 
+  // ✅ FIX: The file is named [id].jsx, so the param is 'id'
+  const { id } = useLocalSearchParams();
+
+  const { activeColors, isDark } = useTheme();
   const [activeFilter, setActiveFilter] = useState("All");
 
-  // Logic to Filter Questions
-  const filteredQuestions = MOCK_SOLUTIONS.filter((q) => {
+  // ✅ Pass 'id' as the attemptId
+  const { loading, summary, questions, error } = useTestSolutions(id);
+
+  // Filter Logic ...
+  const filteredQuestions = questions.filter((q) => {
+    const status = q.status?.toUpperCase() || "UNATTEMPTED";
     if (activeFilter === "All") return true;
-    if (activeFilter === "Correct") return q.userSelected === q.correctOption;
-    if (activeFilter === "Incorrect")
-      return q.userSelected !== null && q.userSelected !== q.correctOption;
-    if (activeFilter === "Skipped") return q.userSelected === null;
+    if (activeFilter === "Correct") return status === "CORRECT";
+    if (activeFilter === "Incorrect") return status === "INCORRECT";
+    if (activeFilter === "Skipped") return status === "UNATTEMPTED";
     return true;
   });
 
-  // Render a Single Question Card
-  const renderQuestionItem = ({ item, index }) => {
-    const isSkipped = item.userSelected === null;
-    const isCorrect = item.userSelected === item.correctOption;
-    const isWrong = !isSkipped && !isCorrect;
-
-    // Status Badge Logic
-    let statusColor = activeColors.textSecondary;
-    let statusText = "Skipped";
-    let statusIcon = "remove-circle-outline";
-
-    if (isCorrect) {
-      statusColor = activeColors.success;
-      statusText = "Correct";
-      statusIcon = "checkmark-circle";
-    } else if (isWrong) {
-      statusColor = activeColors.error;
-      statusText = "Wrong";
-      statusIcon = "close-circle";
-    }
-
+  if (loading) {
     return (
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: isDark ? activeColors.card : "#FFF",
-            borderColor: activeColors.border,
-          },
-        ]}
-      >
-        {/* Question Header */}
-        <View style={styles.cardHeader}>
-          <View style={styles.qNumber}>
-            <ThemedText style={{ fontWeight: "bold", fontSize: 14 }}>
-              Q{index + 1}
-            </ThemedText>
-          </View>
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: statusColor + "20" },
-            ]}
-          >
-            <Ionicons name={statusIcon} size={16} color={statusColor} />
-            <ThemedText
-              style={{
-                fontSize: 12,
-                fontWeight: "bold",
-                color: statusColor,
-                marginLeft: 4,
-              }}
-            >
-              {statusText}
-            </ThemedText>
-          </View>
-        </View>
-
-        <ThemedText style={styles.questionText}>{item.question}</ThemedText>
-
-        {/* Options */}
-        <View style={styles.optionsList}>
-          {item.options.map((opt, idx) => {
-            // Determine Styling for each option
-            let borderColor = activeColors.border;
-            let bgColor = "transparent";
-            let icon = null;
-
-            // 1. If this option is the CORRECT ANSWER -> Always Green
-            if (idx === item.correctOption) {
-              borderColor = activeColors.success;
-              bgColor = isDark ? "rgba(16, 185, 129, 0.15)" : "#DCFCE7";
-              icon = "checkmark-circle";
-            }
-            // 2. If this option was WRONGLY SELECTED -> Red
-            else if (idx === item.userSelected) {
-              borderColor = activeColors.error;
-              bgColor = isDark ? "rgba(239, 68, 68, 0.15)" : "#FEE2E2";
-              icon = "close-circle";
-            }
-
-            return (
-              <View
-                key={idx}
-                style={[
-                  styles.optionBox,
-                  { borderColor, backgroundColor: bgColor },
-                ]}
-              >
-                <ThemedText style={{ flex: 1, color: activeColors.text }}>
-                  {opt}
-                </ThemedText>
-                {icon && <Ionicons name={icon} size={20} color={borderColor} />}
-              </View>
-            );
-          })}
-        </View>
-
-        {/* Explanation Section */}
-        <View
-          style={[
-            styles.explanationBox,
-            { backgroundColor: activeColors.inputBg },
-          ]}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              marginBottom: 5,
-            }}
-          >
-            <Ionicons name="bulb" size={18} color={activeColors.secondary} />
-            <ThemedText
-              style={{
-                fontWeight: "bold",
-                marginLeft: 5,
-                color: activeColors.secondary,
-              }}
-            >
-              Explanation:
-            </ThemedText>
-          </View>
-          <ThemedText variant="caption" style={{ color: activeColors.text }}>
-            {item.explanation}
+      <ThemedScreen>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={activeColors.primary} />
+          <ThemedText style={{ marginTop: 10 }}>
+            Loading Solutions...
           </ThemedText>
         </View>
-      </View>
+      </ThemedScreen>
     );
-  };
+  }
 
   return (
-    <ThemedScreen>
-      {/* Top Bar */}
+    <ThemedScreen edges={["top", "left", "right"]}>
+      {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
           <Ionicons name="arrow-back" size={24} color={activeColors.text} />
         </TouchableOpacity>
-        <ThemedText variant="title" style={{ fontSize: 20 }}>
-          Solutions
-        </ThemedText>
-        <View style={{ width: 24 }} />
+        <ThemedText variant="subtitle">Solutions</ThemedText>
+        <View style={{ width: 40 }} />
       </View>
 
-      {/* Filter Tabs */}
-      <View style={styles.filterContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {FILTERS.map((filter) => (
+      {/* SCORE SUMMARY
+      {summary && (
+        <View
+          style={[
+            styles.summaryCard,
+            { backgroundColor: isDark ? activeColors.card : "#F3F4F6" },
+          ]}
+        >
+          <View style={styles.summaryItem}>
+            <ThemedText
+              style={[styles.summaryLabel, { color: activeColors.success }]}
+            >
+              Correct
+            </ThemedText>
+            <ThemedText style={styles.summaryValue}>
+              {summary.correct || 0}
+            </ThemedText>
+          </View>
+          <View style={styles.summaryItem}>
+            <ThemedText
+              style={[styles.summaryLabel, { color: activeColors.error }]}
+            >
+              Wrong
+            </ThemedText>
+            <ThemedText style={styles.summaryValue}>
+              {summary.incorrect || 0}
+            </ThemedText>
+          </View>
+          <View style={styles.summaryItem}>
+            <ThemedText style={styles.summaryLabel}>Score</ThemedText>
+            <ThemedText style={styles.summaryValue}>
+              {summary.score || 0}
+            </ThemedText>
+          </View>
+        </View>
+      )} */}
+
+      {/* FILTERS */}
+      <View style={{ height: 50 }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16 }}
+        >
+          {FILTERS.map((f) => (
             <TouchableOpacity
-              key={filter}
-              onPress={() => setActiveFilter(filter)}
+              key={f}
+              onPress={() => setActiveFilter(f)}
               style={[
                 styles.chip,
                 {
                   backgroundColor:
-                    activeFilter === filter
+                    activeFilter === f
                       ? activeColors.secondary
                       : isDark
                         ? activeColors.card
-                        : "#F3F4F6",
-                  borderWidth: 1,
-                  borderColor:
-                    activeFilter === filter
-                      ? activeColors.secondary
-                      : "transparent",
+                        : "#E5E7EB",
                 },
               ]}
             >
               <ThemedText
                 style={{
-                  color: activeFilter === filter ? "#FFF" : activeColors.text,
+                  color: activeFilter === f ? "#FFF" : activeColors.text,
                   fontWeight: "600",
                   fontSize: 13,
                 }}
               >
-                {filter}
+                {f}
               </ThemedText>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
 
-      {/* Solutions List */}
+      {/* QUESTIONS LIST */}
       <FlatList
         data={filteredQuestions}
-        renderItem={renderQuestionItem}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item, index) => item.questionId || index.toString()}
         contentContainerStyle={styles.listContent}
+        renderItem={({ item, index }) => (
+          <View
+            style={[
+              styles.card,
+              {
+                backgroundColor: isDark ? activeColors.card : "#FFF",
+                borderColor: activeColors.border,
+              },
+            ]}
+          >
+            <View style={styles.questionHeader}>
+              <View style={styles.qBadge}>
+                <ThemedText style={{ fontSize: 12, fontWeight: "700" }}>
+                  Q{index + 1}
+                </ThemedText>
+              </View>
+              <ThemedText style={styles.questionText}>
+                {item.questionText}
+              </ThemedText>
+            </View>
+
+            <View style={styles.optionsList}>
+              {item.options.map((opt, idx) => {
+                const optionIndex = idx + 1;
+                const isCorrectAnswer = optionIndex === item.correctOption;
+                const isUserSelected = optionIndex === item.userSelectedOption;
+
+                let borderStyle = {
+                  borderColor: activeColors.border,
+                  backgroundColor: "transparent",
+                };
+                let iconName = "ellipse-outline";
+                let iconColor = activeColors.textSecondary;
+
+                if (isCorrectAnswer) {
+                  borderStyle = {
+                    borderColor: activeColors.success,
+                    backgroundColor: isDark
+                      ? "rgba(34, 197, 94, 0.1)"
+                      : "#DCFCE7",
+                  };
+                  iconName = "checkmark-circle";
+                  iconColor = activeColors.success;
+                } else if (isUserSelected && !isCorrectAnswer) {
+                  borderStyle = {
+                    borderColor: activeColors.error,
+                    backgroundColor: isDark
+                      ? "rgba(239, 68, 68, 0.1)"
+                      : "#FEE2E2",
+                  };
+                  iconName = "close-circle";
+                  iconColor = activeColors.error;
+                }
+
+                return (
+                  <View key={idx} style={[styles.optionBox, borderStyle]}>
+                    <Ionicons
+                      name={iconName}
+                      size={20}
+                      color={iconColor}
+                      style={{ marginRight: 10 }}
+                    />
+                    <ThemedText style={{ flex: 1, fontSize: 14 }}>
+                      {opt}
+                    </ThemedText>
+                  </View>
+                );
+              })}
+            </View>
+
+            {item.explanation && (
+              <View
+                style={[
+                  styles.explanationBox,
+                  { backgroundColor: isDark ? "#1F2937" : "#F3F4F6" },
+                ]}
+              >
+                <ThemedText
+                  style={{ fontWeight: "700", marginBottom: 4, fontSize: 13 }}
+                >
+                  Explanation:
+                </ThemedText>
+                <ThemedText
+                  style={{ fontSize: 13, lineHeight: 20, opacity: 0.8 }}
+                >
+                  {item.explanation}
+                </ThemedText>
+              </View>
+            )}
+          </View>
+        )}
       />
     </ThemedScreen>
   );
 }
 
 const styles = StyleSheet.create({
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 15,
+    justifyContent: "space-between",
+    marginBottom: 10,
+    paddingHorizontal: 16,
+    paddingTop: 10,
   },
-  backBtn: { padding: 5 },
-  filterContainer: { marginBottom: 15, height: 40 },
+  summaryCard: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    padding: 15,
+    marginHorizontal: 16,
+    marginBottom: 15,
+    borderRadius: 12,
+  },
+  summaryItem: { alignItems: "center" },
+  summaryLabel: { fontSize: 12, fontWeight: "600", marginBottom: 4 },
+  summaryValue: { fontSize: 18, fontWeight: "800" },
   chip: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 10,
+    height: 36,
+    justifyContent: "center",
   },
-  listContent: { paddingBottom: 30 },
-
-  // Card Styles
+  listContent: { paddingHorizontal: 16, paddingBottom: 40 },
   card: { borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1 },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  qNumber: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+  questionHeader: { flexDirection: "row", marginBottom: 16, gap: 10 },
+  qBadge: {
     backgroundColor: "#E0F2FE",
-    borderRadius: 6,
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 6,
+    height: 24,
+    justifyContent: "center",
   },
-  questionText: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 15,
-    lineHeight: 24,
-  },
-
-  // Options
-  optionsList: { gap: 10, marginBottom: 15 },
+  questionText: { fontSize: 16, fontWeight: "600", lineHeight: 24, flex: 1 },
+  optionsList: { gap: 10, marginBottom: 16 },
   optionBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -312,7 +287,5 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1.5,
   },
-
-  // Explanation
   explanationBox: { padding: 12, borderRadius: 10 },
 });

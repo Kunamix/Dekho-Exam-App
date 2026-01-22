@@ -6,51 +6,100 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 
 import { useTheme } from "../../context/ThemeContext";
-// 1. Import Service
 import { authService } from "../../services/student.service";
 import { ThemedScreen } from "../../src/components/ThemedScreen";
 import { ThemedText } from "../../src/components/ThemedText";
+import { useUpdateProfile } from "../../src/hooks/useStudentActions";
 
-// --- Helper for Text Avatar ---
+/* -------------------------------------------------------------------------- */
+/* Utils */
+/* -------------------------------------------------------------------------- */
 const getInitials = (name) => {
   if (!name) return "U";
   const parts = name.trim().split(" ");
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return name.slice(0, 2).toUpperCase();
+  return parts.length >= 2
+    ? (parts[0][0] + parts[1][0]).toUpperCase()
+    : name.slice(0, 2).toUpperCase();
 };
 
+/* -------------------------------------------------------------------------- */
+/* Profile Screen */
+/* -------------------------------------------------------------------------- */
 export default function ProfileScreen() {
   const router = useRouter();
   const { activeColors, toggleTheme, isDark } = useTheme();
 
-  const [user, setUser] = useState < any > null;
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  /* ================= LOAD USER ================= */
+  const [isEditModalVisible, setEditModalVisible] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+
+  const { updateProfile, loading: updating } = useUpdateProfile();
+
+  /* ================= LOAD PROFILE ================= */
+  const loadProfile = async (showLoader = true) => {
+    try {
+      if (showLoader) setLoading(true);
+
+      // 1️⃣ Load cached user instantly
+      const cached = await AsyncStorage.getItem("userProfile");
+      if (cached) {
+        setUser(JSON.parse(cached));
+      }
+
+      // 2️⃣ Fetch fresh user from API
+      const res = await authService.getMe();
+
+      // ✅ FIX: normalize API response
+      const userData = res?.data ?? res;
+
+      if (userData) {
+        setUser(userData);
+        await AsyncStorage.setItem("userProfile", JSON.stringify(userData));
+      }
+    } catch (err) {
+      console.error("Failed to load profile", err);
+    } finally {
+      if (showLoader) setLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadProfile();
   }, []);
 
-  const loadProfile = async () => {
-    try {
-      setLoading(true);
-      const res = await authService.getMe();
-      setUser(res);
-    } catch (err) {
-      console.log("Failed to load profile", err);
-    } finally {
-      setLoading(false);
+  /* ================= EDIT ================= */
+  const handleEditPress = () => {
+    setEditName(user?.name ?? "");
+    setEditEmail(user?.email ?? "");
+    setEditModalVisible(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim()) {
+      Alert.alert("Required", "Name cannot be empty");
+      return;
     }
+
+    await updateProfile({ name: editName, email: editEmail }, async () => {
+      setEditModalVisible(false);
+      await loadProfile(false); // 🔥 refresh cache + UI
+      Alert.alert("Success", "Profile updated successfully");
+    });
   };
 
   /* ================= LOGOUT ================= */
@@ -63,21 +112,22 @@ export default function ProfileScreen() {
         onPress: async () => {
           try {
             await authService.logout();
-          } catch (_) {
-            // ignore API failure, force logout client-side
-          } finally {
-            await AsyncStorage.multiRemove([
-              "accessToken",
-              "refreshToken",
-              "authPhone",
-            ]);
-            router.replace("/(auth)/login");
-          }
+          } catch (_) {}
+
+          await AsyncStorage.multiRemove([
+            "accessToken",
+            "refreshToken",
+            "userProfile",
+            "authPhone",
+          ]);
+
+          router.replace("/(auth)/login");
         },
       },
     ]);
   };
 
+  /* ================= MENU ITEM ================= */
   const MenuItem = ({ icon, label, onPress, isDestructive, value }) => (
     <TouchableOpacity
       style={[styles.menuItem, { borderBottomColor: activeColors.border }]}
@@ -96,6 +146,7 @@ export default function ProfileScreen() {
           color={isDestructive ? "#EF4444" : activeColors.text}
         />
       </View>
+
       <View style={styles.menuTextContainer}>
         <ThemedText
           style={{
@@ -108,6 +159,7 @@ export default function ProfileScreen() {
         </ThemedText>
         {value && <ThemedText variant="caption">{value}</ThemedText>}
       </View>
+
       <Ionicons
         name="chevron-forward"
         size={20}
@@ -127,13 +179,11 @@ export default function ProfileScreen() {
     );
   }
 
+  /* ================= UI ================= */
   return (
     <ThemedScreen edges={["left", "right", "bottom"]}>
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* USER PROFILE HEADER */}
+      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* PROFILE HEADER */}
         <View style={styles.userSection}>
           <View
             style={[
@@ -150,13 +200,10 @@ export default function ProfileScreen() {
                   { backgroundColor: activeColors.primary },
                 ]}
               >
-                <Text style={styles.avatarText}>
-                  {getInitials(user?.name || "Student")}
-                </Text>
+                <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>
               </View>
             )}
 
-            {/* Edit Badge */}
             <TouchableOpacity
               style={[
                 styles.editBadge,
@@ -165,20 +212,21 @@ export default function ProfileScreen() {
                   borderColor: activeColors.border,
                 },
               ]}
+              onPress={handleEditPress}
             >
-              <Ionicons name="pencil" size={12} color={activeColors.text} />
+              <Ionicons name="pencil" size={14} color={activeColors.text} />
             </TouchableOpacity>
           </View>
 
           <ThemedText style={styles.userName}>
-            {user?.name || "Student User"}
+            {user?.name ?? "Student User"}
           </ThemedText>
-          <ThemedText variant="caption" style={{ fontSize: 14 }}>
-            {user?.phoneNumber || "+91 98765 43210"}
+          <ThemedText variant="caption">
+            {user?.phoneNumber || user?.email || "—"}
           </ThemedText>
         </View>
 
-        {/* STATS ROW (Optional) */}
+        {/* STATS */}
         <View style={[styles.statsRow, { borderColor: activeColors.border }]}>
           <View style={styles.statItem}>
             <ThemedText style={styles.statValue}>
@@ -193,76 +241,36 @@ export default function ProfileScreen() {
             ]}
           />
           <View style={styles.statItem}>
-            <ThemedText style={styles.statValue}>Free</ThemedText>
+            <ThemedText style={styles.statValue}>
+              {user?.subscription?.name || "Free"}
+            </ThemedText>
             <ThemedText variant="caption">Plan</ThemedText>
           </View>
         </View>
 
-        {/* MENU GROUPS */}
-        <View style={styles.sectionHeader}>
-          <ThemedText
-            variant="caption"
-            style={{ fontWeight: "700", opacity: 0.6 }}
-          >
-            ACCOUNT
-          </ThemedText>
-        </View>
-
-        <View
-          style={[
-            styles.menuContainer,
-            {
-              backgroundColor: isDark ? activeColors.card : "#FFF",
-              borderColor: activeColors.border,
-            },
-          ]}
-        >
+        {/* ACCOUNT */}
+        <View style={styles.menuContainer}>
           <MenuItem
             icon="diamond-outline"
             label="My Subscription"
-            value="Upgrade to Pro"
-            onPress={() => router.push("/(tabs)/pass")}
+            value="Upgrade"
+            onPress={() => router.push("/subscription")}
           />
           <MenuItem
             icon="time-outline"
             label="Test History"
-            onPress={() => router.push("/(tabs)/analysis")}
+            onPress={() => router.push("/history")}
           />
           <MenuItem
             icon="person-outline"
-            label="Personal Details"
-            onPress={() => {}}
+            label="Edit Profile"
+            onPress={handleEditPress}
           />
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <ThemedText
-            variant="caption"
-            style={{ fontWeight: "700", opacity: 0.6 }}
-          >
-            PREFERENCES
-          </ThemedText>
-        </View>
-
-        <View
-          style={[
-            styles.menuContainer,
-            {
-              backgroundColor: isDark ? activeColors.card : "#FFF",
-              borderColor: activeColors.border,
-            },
-          ]}
-        >
           <MenuItem
             icon={isDark ? "sunny-outline" : "moon-outline"}
             label="Appearance"
             value={isDark ? "Dark Mode" : "Light Mode"}
             onPress={toggleTheme}
-          />
-          <MenuItem
-            icon="help-circle-outline"
-            label="Help & Support"
-            onPress={() => {}}
           />
           <MenuItem
             icon="log-out-outline"
@@ -274,35 +282,74 @@ export default function ProfileScreen() {
 
         <ThemedText style={styles.versionText}>Version 1.0.0</ThemedText>
       </ScrollView>
+
+      {/* EDIT MODAL */}
+      <Modal visible={isEditModalVisible} transparent animationType="fade">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
+        >
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: isDark ? activeColors.card : "#FFF" },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>Edit Profile</ThemedText>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <Ionicons name="close" size={24} />
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={styles.input}
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Full Name"
+            />
+            <TextInput
+              style={styles.input}
+              value={editEmail}
+              onChangeText={setEditEmail}
+              placeholder="Email"
+              keyboardType="email-address"
+            />
+
+            <TouchableOpacity
+              style={[
+                styles.saveBtn,
+                { backgroundColor: activeColors.primary },
+              ]}
+              onPress={handleSaveProfile}
+              disabled={updating}
+            >
+              {updating ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.saveBtnText}>Save Changes</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </ThemedScreen>
   );
 }
 
-/* ================= STYLES ================= */
+/* -------------------------------------------------------------------------- */
+/* Styles */
+/* -------------------------------------------------------------------------- */
 const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  userSection: {
-    alignItems: "center",
-    marginBottom: 24,
-    marginTop: 20,
-  },
-  /* Avatar Styles */
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  userSection: { alignItems: "center", marginVertical: 24 },
   avatarContainer: {
-    marginBottom: 16,
     borderWidth: 1,
     padding: 4,
     borderRadius: 60,
-    position: "relative",
+    marginBottom: 12,
   },
-  avatarImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
+  avatarImage: { width: 100, height: 100, borderRadius: 50 },
   avatarPlaceholder: {
     width: 100,
     height: 100,
@@ -310,68 +357,36 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  avatarText: {
-    color: "#FFF",
-    fontSize: 36,
-    fontWeight: "700",
-  },
+  avatarText: { color: "#FFF", fontSize: 36, fontWeight: "700" },
   editBadge: {
     position: "absolute",
-    bottom: 0,
     right: 0,
+    bottom: 0,
     width: 32,
     height: 32,
     borderRadius: 16,
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
-    elevation: 2,
   },
+  userName: { fontSize: 24, fontWeight: "800" },
 
-  userName: {
-    fontSize: 24,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
-
-  /* Stats Row */
   statsRow: {
     flexDirection: "row",
-    justifyContent: "space-evenly",
-    alignItems: "center",
-    marginBottom: 30,
     borderWidth: 1,
     borderRadius: 16,
     marginHorizontal: 20,
     paddingVertical: 12,
-    borderStyle: "dashed",
+    marginBottom: 30,
   },
-  statItem: {
-    alignItems: "center",
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: "800",
-    marginBottom: 2,
-  },
-  statDivider: {
-    width: 1,
-    height: "80%",
-  },
+  statItem: { flex: 1, alignItems: "center" },
+  statValue: { fontSize: 18, fontWeight: "800" },
+  statDivider: { width: 1 },
 
-  /* Menu */
-  sectionHeader: {
-    paddingHorizontal: 20,
-    marginBottom: 8,
-    marginTop: 10,
-  },
   menuContainer: {
-    borderRadius: 16,
-    paddingHorizontal: 6,
     marginHorizontal: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    marginBottom: 10,
     overflow: "hidden",
   },
   menuItem: {
@@ -381,7 +396,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderBottomWidth: 1,
   },
-  // Remove border from last item manually if needed, or rely on overflow hidden
   iconBox: {
     width: 38,
     height: 38,
@@ -389,15 +403,41 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  menuTextContainer: {
-    flex: 1,
-    marginLeft: 16,
-  },
+  menuTextContainer: { flex: 1, marginLeft: 16 },
+
   versionText: {
     textAlign: "center",
     opacity: 0.3,
-    fontSize: 12,
     marginTop: 20,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 20,
   },
+  modalTitle: { fontSize: 20, fontWeight: "700" },
+  input: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+  },
+  saveBtn: {
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  saveBtnText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
 });

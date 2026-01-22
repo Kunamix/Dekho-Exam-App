@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -13,25 +14,21 @@ import { useTheme } from "../../context/ThemeContext";
 import { ThemedScreen } from "../../src/components/ThemedScreen";
 import { ThemedText } from "../../src/components/ThemedText";
 
-// 1. Hooks & Services
 import { usePayment } from "../../src/hooks/usePayment";
 import { useSubscriptionPlans } from "../../src/hooks/useStudentData";
 
 export default function PassScreen() {
   const { activeColors, isDark } = useTheme();
 
-  // 2. Data & Payment Hooks
-  const {
-    data: plans = [],
-    loading: loadingPlans,
-    refetch,
-  } = useSubscriptionPlans();
-  const { buyPlan, loading: processingPayment } = usePayment();
+  const { data: apiResponse, loading, refetch } = useSubscriptionPlans();
+  const { buyPlan, loading: processing } = usePayment();
 
-  const [selectedPlanId, setSelectedPlanId] =
-    (useState < string) | (null > null);
+  const plans = Array.isArray(apiResponse)
+    ? apiResponse
+    : apiResponse?.plans || [];
 
-  // Auto-select the first plan when data loads
+  const [selectedPlanId, setSelectedPlanId] = useState(null);
+
   useEffect(() => {
     if (!selectedPlanId && plans.length > 0) {
       setSelectedPlanId(plans[0].id);
@@ -40,17 +37,20 @@ export default function PassScreen() {
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId);
 
-  // 3. Payment Handler
   const handlePurchase = () => {
-    if (!selectedPlan) return;
+    if (!selectedPlan) {
+      Alert.alert("Select Plan", "Please select a plan to continue.");
+      return;
+    }
 
     buyPlan(selectedPlan, () => {
-      refetch(); // Refresh data to show active status if needed
+      refetch();
+      Alert.alert("Success", "Subscription activated successfully!");
     });
   };
 
-  const FeatureRow = ({ text }) => (
-    <View style={styles.featureItem}>
+  const Feature = ({ text }) => (
+    <View style={styles.featureRow}>
       <Ionicons
         name="checkmark-circle"
         size={18}
@@ -63,63 +63,58 @@ export default function PassScreen() {
   return (
     <ThemedScreen edges={["left", "right", "bottom"]}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
         refreshControl={
           <RefreshControl
-            refreshing={loadingPlans}
+            refreshing={loading}
             onRefresh={refetch}
             tintColor={activeColors.primary}
           />
         }
       >
-        {/* === HERO SECTION === */}
-        <View
-          style={[styles.heroCard, { backgroundColor: activeColors.primary }]}
-        >
-          <View style={styles.heroContent}>
-            <View>
-              <ThemedText style={styles.heroTitle}>DekhoExam PRO</ThemedText>
-              <ThemedText style={styles.heroSubtitle}>
-                Unlock premium access to all tests.
-              </ThemedText>
-            </View>
-            <View style={styles.heroIconCircle}>
-              <Ionicons name="diamond" size={28} color="#FFD700" />
-            </View>
+        {/* HERO */}
+        <View style={[styles.hero, { backgroundColor: activeColors.primary }]}>
+          <View>
+            <ThemedText style={styles.heroTitle}>DekhoExam PRO</ThemedText>
+            <ThemedText style={styles.heroSubtitle}>
+              All tests. Full analysis. One pass.
+            </ThemedText>
+          </View>
+          <View style={styles.heroBadge}>
+            <Ionicons name="diamond" size={26} color="#FFD700" />
           </View>
         </View>
 
-        {/* === FEATURES GRID === */}
-        <View style={styles.sectionContainer}>
-          <ThemedText style={styles.sectionHeader}>Premium Benefits</ThemedText>
+        {/* FEATURES */}
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>What you’ll get</ThemedText>
+
           <View style={styles.featuresGrid}>
-            <FeatureRow text="500+ Mock Tests" />
-            <FeatureRow text="Detailed Analysis" />
-            <FeatureRow text="All India Rank" />
-            <FeatureRow text="Ad-Free Learning" />
-            <FeatureRow text="Offline Mode" />
-            <FeatureRow text="Expert Solutions" />
+            <Feature text="500+ Mock Tests" />
+            <Feature text="Detailed Performance Analysis" />
+            <Feature text="All India Rank" />
+            <Feature text="Expert Solutions" />
+            <Feature text="Offline Access" />
+            <Feature text="Ad-Free Experience" />
           </View>
         </View>
 
-        {/* === PLANS SELECTION === */}
-        <View style={styles.sectionContainer}>
-          <ThemedText style={styles.sectionHeader}>Choose a Plan</ThemedText>
+        {/* PLANS */}
+        <View style={[styles.section, { marginBottom: 120 }]}>
+          <ThemedText style={styles.sectionTitle}>Choose your plan</ThemedText>
 
-          {loadingPlans ? (
+          {loading && plans.length === 0 ? (
             <ActivityIndicator
-              size="small"
+              size="large"
               color={activeColors.primary}
               style={{ marginTop: 20 }}
             />
-          ) : plans.length === 0 ? (
-            <ThemedText style={{ opacity: 0.5, fontSize: 13 }}>
-              No plans available currently.
-            </ThemedText>
           ) : (
-            plans.map((plan) => {
-              const isSelected = selectedPlanId === plan.id;
+            plans.map((plan, index) => {
+              const isSelected = plan.id === selectedPlanId;
+              const isPopular = index === 0;
+
               return (
                 <TouchableOpacity
                   key={plan.id}
@@ -132,12 +127,19 @@ export default function PassScreen() {
                       borderColor: isSelected
                         ? activeColors.secondary
                         : activeColors.border,
-                      borderWidth: isSelected ? 1.5 : 1,
+                      borderWidth: isSelected ? 2 : 1,
                     },
                   ]}
                 >
+                  {isPopular && (
+                    <View style={styles.popularBadge}>
+                      <ThemedText style={styles.popularText}>
+                        MOST POPULAR
+                      </ThemedText>
+                    </View>
+                  )}
+
                   <View style={styles.planLeft}>
-                    {/* Radio Button */}
                     <View
                       style={[
                         styles.radioOuter,
@@ -152,18 +154,20 @@ export default function PassScreen() {
                         <View
                           style={[
                             styles.radioInner,
-                            { backgroundColor: activeColors.secondary },
+                            {
+                              backgroundColor: activeColors.secondary,
+                            },
                           ]}
                         />
                       )}
                     </View>
 
-                    <View style={{ marginLeft: 12 }}>
+                    <View style={{ marginLeft: 14 }}>
                       <ThemedText style={styles.planName}>
                         {plan.name}
                       </ThemedText>
                       <ThemedText style={styles.planDuration}>
-                        Valid for {plan.durationDays} days
+                        {plan.durationDays} days access
                       </ThemedText>
                     </View>
                   </View>
@@ -172,8 +176,7 @@ export default function PassScreen() {
                     <ThemedText style={styles.planPrice}>
                       ₹{plan.price}
                     </ThemedText>
-                    {/* Mock original price for UI effect */}
-                    <ThemedText style={styles.planStrikePrice}>
+                    <ThemedText style={styles.planStrike}>
                       ₹{Math.round(plan.price * 1.3)}
                     </ThemedText>
                   </View>
@@ -182,11 +185,9 @@ export default function PassScreen() {
             })
           )}
         </View>
-
-        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* === STICKY BOTTOM BAR === */}
+      {/* BOTTOM CTA */}
       {selectedPlan && (
         <View
           style={[
@@ -199,28 +200,26 @@ export default function PassScreen() {
         >
           <View>
             <ThemedText style={styles.totalLabel}>Total Payable</ThemedText>
-            <ThemedText
-              style={[styles.totalPrice, { color: activeColors.text }]}
-            >
+            <ThemedText style={styles.totalPrice}>
               ₹{selectedPlan.price}
             </ThemedText>
           </View>
 
           <TouchableOpacity
+            onPress={handlePurchase}
+            disabled={processing}
             style={[
-              styles.payButton,
+              styles.payBtn,
               {
                 backgroundColor: activeColors.secondary,
-                opacity: processingPayment ? 0.7 : 1,
+                opacity: processing ? 0.7 : 1,
               },
             ]}
-            onPress={handlePurchase}
-            disabled={processingPayment}
           >
-            {processingPayment ? (
-              <ActivityIndicator color="#FFF" size="small" />
+            {processing ? (
+              <ActivityIndicator color="#FFF" />
             ) : (
-              <ThemedText style={styles.payButtonText}>Buy Now</ThemedText>
+              <ThemedText style={styles.payText}>Buy Now</ThemedText>
             )}
           </TouchableOpacity>
         </View>
@@ -229,90 +228,101 @@ export default function PassScreen() {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*                                   STYLES                                   */
+/* -------------------------------------------------------------------------- */
+
 const styles = StyleSheet.create({
-  scrollContent: {
+  scroll: {
     padding: 16,
   },
 
-  /* Hero Section */
-  heroCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  heroContent: {
+  hero: {
+    borderRadius: 18,
+    padding: 22,
+    marginBottom: 28,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
+
   heroTitle: {
-    color: "#FFF",
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "800",
-    marginBottom: 4,
+    color: "#FFF",
+    marginBottom: 6,
   },
+
   heroSubtitle: {
-    color: "rgba(255,255,255,0.9)",
     fontSize: 13,
-    fontWeight: "500",
+    color: "rgba(255,255,255,0.9)",
   },
-  heroIconCircle: {
-    backgroundColor: "rgba(255,255,255,0.2)",
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+
+  heroBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "rgba(255,255,255,0.25)",
     justifyContent: "center",
     alignItems: "center",
   },
 
-  /* Sections */
-  sectionContainer: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    fontSize: 15,
-    fontWeight: "700",
-    marginBottom: 12,
-    opacity: 0.9,
+  section: {
+    marginBottom: 26,
   },
 
-  /* Features Grid */
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 14,
+  },
+
   featuresGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 14,
   },
-  featureItem: {
+
+  featureRow: {
+    width: "48%",
     flexDirection: "row",
     alignItems: "center",
-    width: "48%", // 2 items per row
-    marginBottom: 4,
   },
+
   featureText: {
     marginLeft: 8,
     fontSize: 13,
-    fontWeight: "500",
-    opacity: 0.8,
+    opacity: 0.85,
   },
 
-  /* Plan Card */
   planCard: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    borderRadius: 14,
     padding: 16,
-    borderRadius: 12,
-    marginBottom: 10,
+    marginBottom: 14,
+    position: "relative",
   },
+
+  popularBadge: {
+    position: "absolute",
+    top: -10,
+    right: 14,
+    backgroundColor: "#FACC15",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+
+  popularText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#000",
+  },
+
   planLeft: {
     flexDirection: "row",
     alignItems: "center",
   },
+
   radioOuter: {
     width: 20,
     height: 20,
@@ -321,68 +331,73 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+
   radioInner: {
     width: 10,
     height: 10,
     borderRadius: 5,
   },
+
   planName: {
     fontSize: 15,
     fontWeight: "700",
   },
+
   planDuration: {
     fontSize: 12,
     opacity: 0.6,
     marginTop: 2,
   },
+
   planRight: {
+    position: "absolute",
+    right: 16,
+    top: 16,
     alignItems: "flex-end",
   },
+
   planPrice: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "800",
   },
-  planStrikePrice: {
+
+  planStrike: {
     fontSize: 11,
-    textDecorationLine: "line-through",
     opacity: 0.5,
+    textDecorationLine: "line-through",
   },
 
-  /* Bottom Sticky Bar */
   bottomBar: {
     position: "absolute",
-    bottom: 0,
     left: 0,
     right: 0,
+    bottom: 0,
+    borderTopWidth: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingBottom: 28,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    elevation: 20, // High elevation for shadow on Android
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
+
   totalLabel: {
     fontSize: 11,
     opacity: 0.6,
-    marginBottom: 2,
   },
+
   totalPrice: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "800",
   },
-  payButton: {
+
+  payBtn: {
+    paddingHorizontal: 36,
     paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 10,
-    minWidth: 140,
-    alignItems: "center",
+    borderRadius: 12,
   },
-  payButtonText: {
+
+  payText: {
     color: "#FFF",
     fontSize: 15,
     fontWeight: "700",

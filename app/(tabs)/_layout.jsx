@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs, useRouter } from "expo-router";
+import { useMemo } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
   SafeAreaView,
@@ -7,26 +8,28 @@ import {
 } from "react-native-safe-area-context";
 
 import { useTheme } from "../../context/ThemeContext";
+import { useAuthUser } from "../../src/hooks/useAuthUser";
 
-// --- Helper to get Initials ---
+/* Utils */
 const getInitials = (name) => {
   if (!name) return "U";
-  const parts = name.split(" ");
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return name.slice(0, 2).toUpperCase();
+  const parts = name.trim().split(" ");
+  return parts.length >= 2
+    ? (parts[0][0] + parts[1][0]).toUpperCase()
+    : name.slice(0, 2).toUpperCase();
 };
 
+/* Header */
 const CustomHeader = () => {
   const router = useRouter();
   const { isDark, toggleTheme, activeColors } = useTheme();
+  const { user } = useAuthUser();
 
-  // 1. Mock User Data (Replace this with real data from your Auth Context later)
-  const user = {
-    name: "Student User",
-    // avatar: null // If avatar is null, we show initials
-  };
+  const initials = useMemo(
+    () => getInitials(user?.data?.name),
+    [user?.data?.name],
+  );
+  console.log("User Initials:", user?.data?.name);
 
   return (
     <SafeAreaView
@@ -35,21 +38,19 @@ const CustomHeader = () => {
         styles.headerContainer,
         {
           backgroundColor: activeColors.background,
-          borderColor: activeColors.border,
+          borderBottomColor: activeColors.border,
         },
       ]}
     >
       <View style={styles.headerContent}>
         <View style={styles.headerLeft}>
-          <View style={styles.logoContainer}>
-            <Image
-              source={require("../../assets/images/logo.png")}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-          </View>
-          <Text style={[styles.headerTitle, { color: activeColors.text }]}>
-            Dekho<Text style={{ color: activeColors.secondary }}>Exam</Text>
+          <Image
+            source={require("../../assets/images/logo.png")}
+            style={styles.logo}
+          />
+          <Text style={[styles.brand, { color: activeColors.text }]}>
+            Dekho
+            <Text style={{ color: activeColors.secondary }}>Exam</Text>
           </Text>
         </View>
 
@@ -59,7 +60,7 @@ const CustomHeader = () => {
             style={[styles.iconBtn, { backgroundColor: activeColors.inputBg }]}
           >
             <Ionicons
-              name={isDark ? "sunny" : "moon"}
+              name={isDark ? "sunny-outline" : "moon-outline"}
               size={20}
               color={isDark ? "#FFD700" : activeColors.primary}
             />
@@ -67,19 +68,14 @@ const CustomHeader = () => {
 
           <TouchableOpacity
             onPress={() => router.push("/(tabs)/profile")}
-            style={styles.profileBtn}
+            style={styles.avatarWrapper}
           >
-            {/* 2. Conditionally Render Image or Text Avatar */}
             <View
-              style={[
-                styles.avatarContainer,
-                { backgroundColor: activeColors.primary }, // Background color for text avatar
-              ]}
+              style={[styles.avatar, { backgroundColor: activeColors.primary }]}
             >
-              <Text style={styles.avatarText}>{getInitials(user.name)}</Text>
+              <Text style={styles.avatarText}>{initials}</Text>
             </View>
 
-            {/* Status Dot */}
             <View
               style={[
                 styles.statusDot,
@@ -96,6 +92,7 @@ const CustomHeader = () => {
   );
 };
 
+/* Tabs */
 export default function TabLayout() {
   const { activeColors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -106,26 +103,16 @@ export default function TabLayout() {
         header: () => <CustomHeader />,
         tabBarActiveTintColor: activeColors.secondary,
         tabBarInactiveTintColor: activeColors.textSecondary,
-        tabBarShowLabel: true,
-
-        tabBarStyle: {
-          backgroundColor: activeColors.background,
-          borderTopColor: activeColors.border,
-          borderTopWidth: 1,
-          height: 60 + (insets.bottom > 0 ? insets.bottom : 10),
-          paddingBottom: insets.bottom > 0 ? insets.bottom : 10,
-          paddingTop: 8,
-          elevation: 10,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.05,
-          shadowRadius: 10,
-        },
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: "700",
-          marginTop: 4,
-        },
+        tabBarLabelStyle: styles.tabLabel,
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            backgroundColor: activeColors.background,
+            borderTopColor: activeColors.border,
+            paddingBottom: insets.bottom || 10,
+            height: 60 + (insets.bottom || 10),
+          },
+        ],
       }}
     >
       <Tabs.Screen
@@ -135,12 +122,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "home" : "home-outline"}
-              size={24}
+              size={22}
               color={color}
             />
           ),
         }}
       />
+
       <Tabs.Screen
         name="tests"
         options={{
@@ -148,7 +136,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "document-text" : "document-text-outline"}
-              size={24}
+              size={22}
               color={color}
             />
           ),
@@ -159,13 +147,12 @@ export default function TabLayout() {
         name="analysis"
         options={{
           title: "Analysis",
-          tabBarIcon: ({ color, focused }) => (
+          tabBarIcon: () => (
             <View
               style={[
                 styles.centerTab,
                 {
                   backgroundColor: activeColors.secondary,
-                  shadowColor: activeColors.secondary,
                   borderColor: activeColors.background,
                 },
               ]}
@@ -173,11 +160,6 @@ export default function TabLayout() {
               <Ionicons name="stats-chart" size={26} color="#FFF" />
             </View>
           ),
-          tabBarLabelStyle: {
-            marginTop: 22,
-            fontWeight: "800",
-            color: activeColors.secondary,
-          },
         }}
       />
 
@@ -188,12 +170,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "diamond" : "diamond-outline"}
-              size={24}
+              size={22}
               color={color}
             />
           ),
         }}
       />
+
       <Tabs.Screen
         name="profile"
         options={{
@@ -201,7 +184,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "person" : "person-outline"}
-              size={24}
+              size={22}
               color={color}
             />
           ),
@@ -211,78 +194,53 @@ export default function TabLayout() {
   );
 }
 
+/* Styles */
 const styles = StyleSheet.create({
-  headerContainer: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 4,
-    borderBottomWidth: 1,
-    paddingHorizontal: 16,
-  },
+  headerContainer: { borderBottomWidth: 1, paddingHorizontal: 16 },
   headerContent: {
+    height: 52,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    height: 50,
   },
   headerLeft: { flexDirection: "row", alignItems: "center" },
-  logoContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    overflow: "hidden",
-    marginRight: 8,
-  },
-  logoImage: { width: "100%", height: "100%" },
-  headerTitle: { fontSize: 20, fontWeight: "800", letterSpacing: -0.5 },
-  headerRight: { flexDirection: "row", alignItems: "center", gap: 12 },
+  logo: { width: 34, height: 34, marginRight: 8, borderRadius: 8 },
+  brand: { fontSize: 20, fontWeight: "800" },
+  headerRight: { flexDirection: "row", gap: 12 },
   iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: "center",
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
-  },
-  profileBtn: {
-    width: 40,
-    height: 40,
-    position: "relative",
-  },
-  /* 3. New Avatar Styles */
-  avatarContainer: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 20,
     justifyContent: "center",
+  },
+  avatarWrapper: { width: 38, height: 38 },
+  avatar: {
+    flex: 1,
+    borderRadius: 19,
     alignItems: "center",
+    justifyContent: "center",
   },
-  avatarText: {
-    color: "#FFF",
-    fontSize: 14,
-    fontWeight: "800",
-  },
+  avatarText: { color: "#FFF", fontWeight: "800" },
   statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
     position: "absolute",
-    bottom: 0,
-    right: 0,
+    bottom: -1,
+    right: -1,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     borderWidth: 2,
   },
+  tabBar: { borderTopWidth: 1, paddingTop: 6 },
+  tabLabel: { fontSize: 10, fontWeight: "700" },
   centerTab: {
-    alignItems: "center",
-    justifyContent: "center",
-    top: -15,
+    top: -16,
     width: 56,
     height: 56,
     borderRadius: 28,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 8,
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 4,
+    elevation: 10,
   },
 });

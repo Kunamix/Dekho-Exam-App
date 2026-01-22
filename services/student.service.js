@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import api from "../src/api/client";
 
 // --- Helper: Consistent Error Handling ---
@@ -15,10 +16,9 @@ export const authService = {
     const { data } = await api.post("/auth/login", { phoneNumber: phone });
     return data;
   },
-  verifyOtp: async (phone, otp) => {
+  verifyOtp: async (otp) => {
     const { data } = await api.post("/auth/verify-otp", {
-      phoneNumber: phone,
-      otp,
+      otpCode: otp,
     });
     return data;
   },
@@ -26,9 +26,17 @@ export const authService = {
     const { data } = await api.post("/auth/logout");
     return data;
   },
-  getMe: async () => {
-    const { data } = await api.get("/auth/me");
-    return data.data;
+  async getMe() {
+    const res = await api.get("/auth/me");
+
+    // ✅ Cache user
+    await AsyncStorage.setItem("userProfile", JSON.stringify(res.data));
+
+    return res.data;
+  },
+  updateProfile: async (data) => {
+    const res = await api.put(`/user/update-profile`, data);
+    return res.data;
   },
 };
 
@@ -38,22 +46,33 @@ export const authService = {
 export const contentService = {
   getCategories: async () => {
     const { data } = await api.get("/category/categories");
+    console.log("Fetched Categories:", data);
     return data.data;
   },
   checkCategoryAccess: async (categoryId) => {
     const { data } = await api.get(
       `/category/check-category-access/${categoryId}`,
     );
-    return data.data; // Returns { isUnlocked: boolean, purchaseOption: ... }
+
+    const response = data.data;
+    return {
+      hasAccess: response.isUnlocked,
+      planId: response.purchaseOption?.id,
+      planName: response.purchaseOption?.name,
+      price: response.purchaseOption?.price,
+      duration: response.purchaseOption?.durationDays,
+    };
   },
   getTestsByCategory: async (categoryId) => {
     const { data } = await api.get(
       `/test/get-test-by-category-id/${categoryId}`,
     );
+    console.log(`Fetched Tests for Category ${categoryId}:`, data);
     return data.data;
   },
   getPopularTests: async () => {
     const { data } = await api.get("/test/get-popular-tests");
+    console.log("Fetched Popular Tests:", data);
     return data.data;
   },
 };
@@ -93,6 +112,11 @@ export const testService = {
     const { data } = await api.get("/test/attempt-history");
     return data.data;
   },
+  viewSolution: async (attemptId) => {
+    const { data } = await api.get(`/test/view-solution/${attemptId}`);
+    console.log("Fetched Solutions for Attempt:", attemptId, data);
+    return data.data;
+  },
 };
 
 // ==========================================
@@ -101,6 +125,7 @@ export const testService = {
 export const subscriptionService = {
   getAllPlans: async () => {
     const { data } = await api.get("/subscription/get-all-subscriptions");
+    console.log("Fetched Subscription Plans:", data);
     return data.data;
   },
   getMySubscriptions: async () => {

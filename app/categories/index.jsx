@@ -1,101 +1,105 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  RefreshControl,
   StyleSheet,
   TouchableOpacity,
   View,
 } from "react-native";
 
 import { useTheme } from "../../context/ThemeContext";
-import { getAllCategories } from "../../src/api/category.api";
 import { ThemedScreen } from "../../src/components/ThemedScreen";
 import { ThemedText } from "../../src/components/ThemedText";
+
+// 1. Import Hook
+import { useCategories } from "../../src/hooks/useStudentData";
+
+// UI Constants
+const CAT_PALETTE = [
+  { color: "#E0F2FE", accent: "#007ACC", icon: "briefcase" },
+  { color: "#FEF3C7", accent: "#F59E0B", icon: "cash" },
+  { color: "#FEE2E2", accent: "#EF4444", icon: "train" },
+  { color: "#D1FAE5", accent: "#10B981", icon: "school" },
+  { color: "#EDE9FE", accent: "#8B5CF6", icon: "shield" },
+  { color: "#FFEDD5", accent: "#FB923C", icon: "map" },
+];
 
 export default function AllCategoriesScreen() {
   const router = useRouter();
   const { activeColors, isDark } = useTheme();
 
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  /* ================= LOAD DATA ================= */
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  const fetchCategories = async () => {
-    try {
-      setLoading(true);
-      const res = await getAllCategories();
-      setCategories(res); // interceptor already returns response.data
-    } catch (err) {
-      setError(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // 2. Use Hook
+  const { data: categories = [], loading, error, refetch } = useCategories();
 
   /* ================= RENDER ================= */
-  const renderCategory = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        styles.gridItem,
-        {
-          backgroundColor: isDark
-            ? activeColors.card
-            : item.color || activeColors.card,
-          borderColor: activeColors.border,
-        },
-      ]}
-      onPress={() => router.push(`/categories/${item.id}?name=${item.name}`)}
-    >
-      <View
+  const renderCategory = ({ item, index }) => {
+    // Assign Theme based on index
+    const theme = CAT_PALETTE[index % CAT_PALETTE.length];
+
+    return (
+      <TouchableOpacity
         style={[
-          styles.iconCircle,
-          { backgroundColor: isDark ? activeColors.inputBg : "#FFF" },
+          styles.gridItem,
+          {
+            backgroundColor: isDark ? activeColors.card : theme.color, // Use palette color
+            borderColor: activeColors.border,
+          },
         ]}
+        onPress={() =>
+          router.push({
+            pathname: `/categories/${item.id}`,
+            params: { name: item.name },
+          })
+        }
+        activeOpacity={0.8}
       >
-        <Ionicons
-          name={item.icon || "grid"}
-          size={28}
-          color={item.accent || activeColors.primary}
-        />
-      </View>
-
-      <ThemedText style={styles.catName}>{item.name}</ThemedText>
-
-      <ThemedText variant="caption" style={{ marginTop: 4 }}>
-        {item.totalTests ? `${item.totalTests}+ Tests` : "Tests Available"}
-      </ThemedText>
-    </TouchableOpacity>
-  );
-
-  /* ================= STATES ================= */
-  if (loading) {
-    return (
-      <ThemedScreen>
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={activeColors.primary} />
+        <View
+          style={[
+            styles.iconCircle,
+            { backgroundColor: isDark ? activeColors.inputBg : "#FFF" },
+          ]}
+        >
+          <Ionicons
+            name={theme.icon || "grid"}
+            size={28}
+            color={theme.accent}
+          />
         </View>
-      </ThemedScreen>
-    );
-  }
 
-  if (error) {
+        <ThemedText style={styles.catName} numberOfLines={2}>
+          {item.name}
+        </ThemedText>
+
+        <ThemedText variant="caption" style={{ marginTop: 4, opacity: 0.7 }}>
+          {item.testsCount ? `${item.testsCount}+ Tests` : "Explore"}
+        </ThemedText>
+      </TouchableOpacity>
+    );
+  };
+
+  /* ================= ERROR STATE ================= */
+  if (error && !loading && categories.length === 0) {
     return (
       <ThemedScreen>
         <View style={styles.center}>
-          <Ionicons name="alert-circle" size={28} color={activeColors.error} />
-          <ThemedText style={{ marginTop: 10, color: activeColors.error }}>
-            {error}
+          <Ionicons name="alert-circle" size={40} color="#EF4444" />
+          <ThemedText
+            style={{
+              marginTop: 10,
+              color: activeColors.textSecondary,
+              textAlign: "center",
+            }}
+          >
+            {error || "Failed to load categories."}
           </ThemedText>
 
-          <TouchableOpacity style={styles.retryBtn} onPress={fetchCategories}>
-            <ThemedText style={{ fontWeight: "700" }}>Retry</ThemedText>
+          <TouchableOpacity
+            style={[styles.retryBtn, { borderColor: activeColors.border }]}
+            onPress={refetch}
+          >
+            <ThemedText style={{ fontWeight: "700" }}>Try Again</ThemedText>
           </TouchableOpacity>
         </View>
       </ThemedScreen>
@@ -103,7 +107,7 @@ export default function AllCategoriesScreen() {
   }
 
   return (
-    <ThemedScreen>
+    <ThemedScreen edges={["top", "left", "right"]}>
       {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -118,15 +122,28 @@ export default function AllCategoriesScreen() {
       </View>
 
       {/* LIST */}
-      <FlatList
-        data={categories}
-        renderItem={renderCategory}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        contentContainerStyle={styles.list}
-        columnWrapperStyle={{ justifyContent: "space-between" }}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading && categories.length === 0 ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={activeColors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={categories}
+          renderItem={renderCategory}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          contentContainerStyle={styles.list}
+          columnWrapperStyle={{ justifyContent: "space-between" }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={refetch}
+              tintColor={activeColors.primary}
+            />
+          }
+        />
+      )}
     </ThemedScreen>
   );
 }
@@ -137,10 +154,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 10,
   },
   backBtn: { padding: 4 },
-  list: { paddingBottom: 20 },
+  list: { paddingBottom: 20, paddingTop: 10 },
 
   gridItem: {
     width: "48%",
@@ -149,6 +168,11 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     alignItems: "center",
     borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   iconCircle: {
     width: 50,
@@ -158,14 +182,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
     shadowColor: "#000",
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 5,
     elevation: 2,
   },
   catName: {
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: 15,
     textAlign: "center",
+    lineHeight: 20,
   },
 
   center: {
@@ -175,9 +200,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   retryBtn: {
-    marginTop: 14,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    marginTop: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
   },

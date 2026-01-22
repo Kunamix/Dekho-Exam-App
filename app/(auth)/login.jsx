@@ -35,34 +35,33 @@ export default function LoginScreen() {
 
   const handleGetOTP = async () => {
     Keyboard.dismiss();
-
-    // Basic Validation
     if (phone.length !== 10) {
       Alert.alert("Invalid Number", "Please enter a valid 10-digit number");
       return;
     }
 
     try {
-      // The hook handles the API call and basic error alerting
       const response = await login(phone);
 
       if (response && response.success) {
-        // Save temporary auth state if needed (though usually done after OTP verify)
-        // Storing phone to pre-fill or retry on next screen is good practice
+        // ✅ FIX: Save the Verification Token from response
+        const vToken = response.data?.verificationToken;
+        // if (vToken) {
+        //   await AsyncStorage.setItem("verificationToken", vToken);
+        //   console.log("✅ Verification Token Saved");
+        // }
+
         await AsyncStorage.setItem("authPhone", phone);
 
-        // Navigate to OTP screen
         router.push({
           pathname: "/(auth)/otp",
           params: { phone: phone },
         });
       }
     } catch (err) {
-      // Hook already alerts errors, but you can add custom logic here if needed
       console.log("Login flow interrupted", err);
     }
   };
-
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={styles.container}>

@@ -1,73 +1,49 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 import { useTheme } from "../../context/ThemeContext";
 import { SearchBar } from "../../src/components/SearchBar";
 import { ThemedScreen } from "../../src/components/ThemedScreen";
 import { ThemedText } from "../../src/components/ThemedText";
 
-// Mock History Data
-const HISTORY_DATA = [
-  {
-    id: "1",
-    title: "SSC CGL Tier I - Full Mock",
-    score: "85/100",
-    accuracy: "90%",
-    date: "2 Oct, 2023",
-    status: "Passed",
-  },
-  {
-    id: "2",
-    title: "SBI PO Prelims Mock 3",
-    score: "62/100",
-    accuracy: "75%",
-    date: "1 Oct, 2023",
-    status: "Average",
-  },
-  {
-    id: "3",
-    title: "RRB NTPC Gen. Awareness",
-    score: "40/50",
-    accuracy: "88%",
-    date: "28 Sep, 2023",
-    status: "Passed",
-  },
-  {
-    id: "4",
-    title: "English Grammar - Noun",
-    score: "15/30",
-    accuracy: "50%",
-    date: "25 Sep, 2023",
-    status: "Failed",
-  },
-  {
-    id: "5",
-    title: "Maths Sectional - Algebra",
-    score: "22/25",
-    accuracy: "95%",
-    date: "20 Sep, 2023",
-    status: "Passed",
-  },
-];
+// 1. Import Hook
+import { useTestHistory } from "../../src/hooks/useStudentData";
 
 export default function HistoryScreen() {
   const router = useRouter();
   const { activeColors, isDark } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Filter Logic
-  const filteredHistory = HISTORY_DATA.filter((item) =>
-    item.title.toLowerCase().includes(searchQuery.toLowerCase()),
+  // 2. Fetch Real Data
+  const { data: history = [], loading, refetch } = useTestHistory();
+
+  // 3. Filter Logic
+  const filteredHistory = history.filter((item) =>
+    item.testName.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const renderHistoryItem = ({ item }) => {
-    // Status Color Logic
-    let statusColor = activeColors.textSecondary;
-    if (item.status === "Passed") statusColor = activeColors.success;
-    if (item.status === "Failed") statusColor = activeColors.error;
-    if (item.status === "Average") statusColor = "#F59E0B"; // Orange
+    // Determine Status & Color based on Percentage
+    // (You can adjust these thresholds)
+    let status = "Average";
+    let statusColor = "#F59E0B"; // Orange
+
+    if (item.percentage >= 80) {
+      status = "Excellent";
+      statusColor = activeColors.success;
+    } else if (item.percentage < 40) {
+      status = "Needs Improvement";
+      statusColor = activeColors.error;
+    }
 
     return (
       <TouchableOpacity
@@ -79,16 +55,25 @@ export default function HistoryScreen() {
             borderColor: activeColors.border,
           },
         ]}
-        onPress={() => router.push(`/solutions/${item.id}`)}
+        onPress={() =>
+          router.push({
+            pathname: "/solutions/[id]", // Must match filename exactly
+            params: { id: item.attemptId }, // Key must be 'id'
+          })
+        }
       >
         {/* Header: Title & Date */}
         <View style={styles.cardHeader}>
           <View style={{ flex: 1, paddingRight: 10 }}>
             <ThemedText style={styles.title} numberOfLines={1}>
-              {item.title}
+              {item.testName}
             </ThemedText>
             <ThemedText variant="caption" style={{ marginTop: 2 }}>
-              {item.date}
+              {new Date(item.submittedAt).toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
             </ThemedText>
           </View>
           <View
@@ -100,7 +85,7 @@ export default function HistoryScreen() {
             <ThemedText
               style={{ fontSize: 10, fontWeight: "bold", color: statusColor }}
             >
-              {item.status.toUpperCase()}
+              {status.toUpperCase()}
             </ThemedText>
           </View>
         </View>
@@ -128,7 +113,7 @@ export default function HistoryScreen() {
           <View style={styles.statItem}>
             <ThemedText variant="caption">Accuracy</ThemedText>
             <ThemedText style={{ fontWeight: "bold", fontSize: 16 }}>
-              {item.accuracy}
+              {item.accuracy}%
             </ThemedText>
           </View>
 
@@ -143,7 +128,7 @@ export default function HistoryScreen() {
                   fontSize: 13,
                 }}
               >
-                View Solution
+                View Report
               </ThemedText>
               <Ionicons
                 name="chevron-forward"
@@ -158,7 +143,7 @@ export default function HistoryScreen() {
   };
 
   return (
-    <ThemedScreen>
+    <ThemedScreen edges={["top", "left", "right"]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -180,27 +165,43 @@ export default function HistoryScreen() {
       </View>
 
       {/* List */}
-      <FlatList
-        data={filteredHistory}
-        renderItem={renderHistoryItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={{ alignItems: "center", marginTop: 50 }}>
-            <Ionicons
-              name="document-text-outline"
-              size={60}
-              color={activeColors.textSecondary}
+      {loading && history.length === 0 ? (
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
+          <ActivityIndicator size="large" color={activeColors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredHistory}
+          renderItem={renderHistoryItem}
+          keyExtractor={(item) => item.attemptId}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={refetch}
+              tintColor={activeColors.primary}
             />
-            <ThemedText
-              style={{ marginTop: 10, color: activeColors.textSecondary }}
-            >
-              No history found.
-            </ThemedText>
-          </View>
-        }
-      />
+          }
+          ListEmptyComponent={
+            <View style={{ alignItems: "center", marginTop: 50 }}>
+              <Ionicons
+                name="document-text-outline"
+                size={60}
+                color={activeColors.textSecondary}
+                style={{ opacity: 0.5 }}
+              />
+              <ThemedText
+                style={{ marginTop: 10, color: activeColors.textSecondary }}
+              >
+                No history found.
+              </ThemedText>
+            </View>
+          }
+        />
+      )}
     </ThemedScreen>
   );
 }
@@ -211,20 +212,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
+    marginTop: 10,
   },
   backBtn: { padding: 4 },
-
-  // Search
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 15,
-    height: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 20,
-  },
-  input: { flex: 1, marginLeft: 10, fontSize: 16 },
 
   // List
   listContent: { paddingBottom: 30 },

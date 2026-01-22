@@ -1,106 +1,76 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
-import { router } from "expo-router";
-import { Alert } from "react-native";
 
-// 1. Dynamic Base URL (Use .env file or fallback to local IP)
-// Create a .env file in root: EXPO_PUBLIC_API_URL=http://192.168.1.37:8080/api/v1
-const BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL || "http://192.168.1.37:8080/api/v1";
+// Replace with your actual backend URL (e.g., http://192.168.1.5:5000/api/v1)
+const BASE_URL = "https://dekho-exam.onrender.com/api/v1";
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
-  timeout: 15000,
+  timeout: 10000,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-/* ================= REQUEST INTERCEPTOR ================= */
+// --- REQUEST INTERCEPTOR (The Critical Part) ---
 apiClient.interceptors.request.use(
   async (config) => {
     try {
-      // 2. Add Token
-      const accessToken = await AsyncStorage.getItem("accessToken");
-      if (accessToken) {
-        config.headers.Authorization = `Bearer ${accessToken}`;
-      }
+      // 1. Log what we are trying to do
+      console.log(`[API Request] ${config.method.toUpperCase()} ${config.url}`);
 
-      // Debug Logging (Only in Dev)
-      if (__DEV__) {
-        console.log(`[API Req] ${config.method?.toUpperCase()} ${config.url}`);
+      // 2. Try to get the token
+      const token = await AsyncStorage.getItem("accessToken");
+
+      // 3. Log the token status (don't log the full token for security, just presence)
+      console.log("[API Client] Token found in storage?", !!token);
+
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.log("[API Client] Attached 'Authorization' header");
+      } else {
+        console.warn(
+          "[API Client] ⚠️ No token found! Request sent without auth.",
+        );
       }
     } catch (error) {
-      console.error("Error reading token", error);
+      console.error("[API Client] Error retrieving token:", error);
     }
     return config;
   },
-  (error) => Promise.reject(error),
+  (error) => {
+    return Promise.reject(error);
+  },
 );
 
-/* ================= RESPONSE INTERCEPTOR ================= */
+// --- RESPONSE INTERCEPTOR (For Debugging Errors) ---
 apiClient.interceptors.response.use(
   (response) => {
-    // Debug Logging
-    if (__DEV__) {
-      console.log(`[API Res] ${response.status} ${response.config.url}`);
-    }
-    // 3. Unwrap Data directly
+    console.log(
+      `[API Response] ${response.status} from ${response.config.url}`,
+    );
     return response;
   },
-  async (error) => {
-    const status = error.response?.status;
-    const originalRequest = error.config;
-
-    // Extract server error message or fallback
-    const message =
-      error.response?.data?.message || error.message || "Something went wrong";
-
-    if (__DEV__) {
-      console.error(`[API Error] ${status} - ${message}`);
-    }
-
-    // 🔴 401: UNAUTHORIZED (Token Expired or Invalid)
-    if (status === 401) {
-      console.warn("Session expired. Logging out...");
-
-      await AsyncStorage.multiRemove([
-        "accessToken",
-        "refreshToken",
-        "userProfile",
-      ]);
-
-      // Prevent redirect loop if already on login/auth pages
-      // Note: In a pure JS function we can't check current route easily without passing hooks,
-      // so we blindly replace. Expo Router handles this gracefully usually.
-      router.replace("/(auth)/login");
-
-      return Promise.reject("Session expired. Please login again.");
-    }
-
-    // 🔴 403: FORBIDDEN (Account Blocked)
-    if (status === 403) {
-      await AsyncStorage.clear();
-      Alert.alert(
-        "Access Denied",
-        "Your account may be suspended. Contact support.",
+  (error) => {
+    if (error.response) {
+      // Server responded with a status code other than 2xx
+      console.error(
+        `[API Error] ${error.response.status} - ${error.response.data?.message || "Unknown error"}`,
       );
-      router.replace("/(auth)/login");
-      return Promise.reject(message);
-    }
 
-    // 🔴 429: TOO MANY REQUESTS
-    if (status === 429) {
-      return Promise.reject("Too many attempts. Please try again later.");
+      if (error.response.status === 401) {
+        console.error("🔒 Unauthorized! Token might be invalid or expired.");
+        // Optional: Trigger logout here
+      }
+    } else if (error.request) {
+      // Request was made but no response received
+      console.error(
+        "[API Error] No response from server. Is the backend running?",
+      );
+    } else {
+      console.error("[API Error] Request setup failed:", error.message);
     }
-
-    // 🔴 500: SERVER ERROR
-    if (status && status >= 500) {
-      return Promise.reject("Server error. We are working on it.");
-    }
-
-    // Return the extracted message string for easy display in UI
-    return Promise.reject(message);
+    return Promise.reject(error);
   },
 );
 

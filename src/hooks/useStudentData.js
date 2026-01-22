@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-    contentService,
-    handleApiError,
-    subscriptionService,
-    testService,
-} from "../services/student.service";
+  contentService,
+  handleApiError,
+  subscriptionService,
+  testService,
+} from "../../services/student.service";
 
 // ------------------------------
 // Generic Hook Factory (GET)
@@ -15,7 +15,13 @@ function useFetchData(apiCall, initialData, dependencyVal) {
   const [error, setError] = useState(null);
 
   const fetchData = useCallback(async () => {
-    if (dependencyVal === "" || dependencyVal == null) return;
+    // ✅ Only block if dependency is REQUIRED and missing
+    if (
+      dependencyVal !== undefined &&
+      (dependencyVal === "" || dependencyVal == null)
+    ) {
+      return;
+    }
 
     try {
       setLoading(true);
@@ -41,7 +47,10 @@ function useFetchData(apiCall, initialData, dependencyVal) {
 // ------------------------------
 
 export const useCategories = () =>
-  useFetchData(contentService.getCategories, []);
+  useFetchData(async () => {
+    const res = await contentService.getCategories();
+    return res.categories; // ✅ extract array
+  }, []);
 
 export const useTestsByCategory = (categoryId) =>
   useFetchData(
@@ -50,13 +59,21 @@ export const useTestsByCategory = (categoryId) =>
     categoryId,
   );
 
-export const usePopularTests = () =>
-  useFetchData(contentService.getPopularTests, []);
+export const useCategoryAccess = (categoryId) =>
+  useFetchData(
+    () => contentService.checkCategoryAccess(categoryId),
+    null,
+    categoryId,
+  );
 
-export const useTestHistory = () => useFetchData(testService.getHistory, []);
+export const usePopularTests = () =>
+  useFetchData(() => contentService.getPopularTests(), []);
+
+export const useTestHistory = () =>
+  useFetchData(() => testService.getHistory(), []);
 
 export const useTestResult = (attemptId) =>
   useFetchData(() => testService.getResult(attemptId), null, attemptId);
 
 export const useSubscriptionPlans = () =>
-  useFetchData(subscriptionService.getAllPlans, []);
+  useFetchData(() => subscriptionService.getAllPlans(), []);

@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
@@ -18,8 +17,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// 1. Import Custom Hooks
+// Import Custom Hooks
 import { Colors } from "../../src/constants/Colors";
+import { useAuth } from "../../src/hooks/AuthContext";
 import { useLogin, useVerifyOtp } from "../../src/hooks/useStudentActions";
 
 const OTP_LENGTH = 6;
@@ -29,16 +29,14 @@ export default function OTPScreen() {
   const { phone } = useLocalSearchParams();
   const scheme = useColorScheme() ?? "light";
   const theme = Colors[scheme];
+  const { login, isAuthenticated } = useAuth();
 
-  // 2. Initialize Hooks
+  // Initialize Hooks
   const { verify, loading: verifying } = useVerifyOtp();
   const { login: resendOtp, loading: resending } = useLogin();
 
   const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(""));
-
-  // ✅ FIX: Initialize ref as an empty array
   const inputs = useRef([]);
-
   const [timer, setTimer] = useState(30);
   const [error, setError] = useState("");
 
@@ -47,8 +45,8 @@ export default function OTPScreen() {
   /* ================= TIMER ================= */
   useEffect(() => {
     if (timer <= 0) return;
-    const i = setInterval(() => setTimer((t) => t - 1), 1000);
-    return () => clearInterval(i);
+    const interval = setInterval(() => setTimer((t) => t - 1), 1000);
+    return () => clearInterval(interval);
   }, [timer]);
 
   /* ================= OTP INPUT ================= */
@@ -64,6 +62,7 @@ export default function OTPScreen() {
       setOtp(newOtp);
       const nextIndex = Math.min(index + digit.length, OTP_LENGTH - 1);
       inputs.current[nextIndex]?.focus();
+
       if (newOtp.join("").length === OTP_LENGTH) {
         Keyboard.dismiss();
         handleVerify(newOtp.join(""));
@@ -113,20 +112,13 @@ export default function OTPScreen() {
 
     try {
       setError("");
-      const response = await verify(code);
 
-      if (response) {
-        // Save tokens
-        if (response.accessToken) {
-          await AsyncStorage.setItem("accessToken", response.accessToken);
-        }
-        if (response.refreshToken) {
-          await AsyncStorage.setItem("refreshToken", response.refreshToken);
-        }
+      // The verify hook now handles auth context update and navigation
+      const res = await verify(code);
+      console.log("Verify response:", res);
+      login(res.data.accessToken, res.data.user);
 
-        // Navigate
-        router.replace("/(tabs)");
-      }
+      // Navigation is handled by useVerifyOtp hook and AuthContext
     } catch (err) {
       setError("Invalid OTP. Please try again.");
       setOtp(Array(OTP_LENGTH).fill(""));
@@ -192,13 +184,12 @@ export default function OTPScreen() {
               {otp.map((digit, index) => (
                 <TextInput
                   key={index}
-                  // ✅ FIX: Assign ref directly to array index
                   ref={(el) => (inputs.current[index] = el)}
                   value={digit}
                   onChangeText={(text) => handleChange(text, index)}
                   onKeyPress={(e) => handleBackspace(e, index)}
                   keyboardType="number-pad"
-                  maxLength={1} // Or 6 if handling paste logic differently
+                  maxLength={1}
                   textAlign="center"
                   editable={!loading}
                   selectTextOnFocus
@@ -256,7 +247,7 @@ export default function OTPScreen() {
                 },
               ]}
               onPress={() => handleVerify(otp.join(""))}
-              disabled={loading}
+              disabled={loading || otp.join("").length < OTP_LENGTH}
             >
               {loading ? (
                 <ActivityIndicator color="#FFF" />

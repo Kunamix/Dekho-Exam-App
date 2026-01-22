@@ -6,19 +6,18 @@ import {
   handleApiError,
   testService,
 } from "../../services/student.service";
+import { useAuth } from "./AuthContext";
 
 // --- AUTH HOOKS ---
 
 export const useLogin = () => {
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const login = async (phone) => {
     try {
       setLoading(true);
       const res = await authService.login(phone);
       console.log("Login response:", res);
-      // Backend should return success message or OTP sent status
       return res;
     } catch (err) {
       const msg = handleApiError(err, "Login failed");
@@ -34,13 +33,27 @@ export const useLogin = () => {
 
 export const useVerifyOtp = () => {
   const [loading, setLoading] = useState(false);
+  const { login: saveAuth } = useAuth();
+  const router = useRouter();
 
   const verify = async (phone, otp) => {
     try {
       setLoading(true);
       const res = await authService.verifyOtp(phone, otp);
       console.log("OTP Verification response:", res);
-      // Handle Token Storage here (AsyncStorage) usually
+
+      // Assuming res contains { token, user } or similar
+      if (res.token && res.user) {
+        await saveAuth(res.token, res.user);
+
+        // Check if profile is complete
+        if (res.user.profileComplete) {
+          router.replace("/(tabs)/home");
+        } else {
+          router.push("/profile-setup");
+        }
+      }
+
       return res;
     } catch (err) {
       const msg = handleApiError(err, "Verification failed");
@@ -56,15 +69,27 @@ export const useVerifyOtp = () => {
 
 export const useUpdateProfile = () => {
   const [loading, setLoading] = useState(false);
+  const { updateUser } = useAuth();
+  const router = useRouter();
 
   const updateProfile = async (data, onSuccess) => {
     try {
       setLoading(true);
 
       const res = await authService.updateProfile(data);
+
+      // Update user in context
+      if (res.user) {
+        await updateUser(res.user);
+      }
+
       Alert.alert("Success", "Profile updated successfully!");
 
-      if (onSuccess) onSuccess();
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.replace("/(tabs)/home");
+      }
 
       return res;
     } catch (err) {
@@ -77,6 +102,24 @@ export const useUpdateProfile = () => {
   };
 
   return { updateProfile, loading };
+};
+
+export const useLogout = () => {
+  const { logout } = useAuth();
+  const [loading, setLoading] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      setLoading(true);
+      await logout();
+    } catch (error) {
+      Alert.alert("Error", "Failed to logout");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { logout: handleLogout, loading };
 };
 
 // --- TEST ENGINE HOOKS ---
@@ -128,7 +171,6 @@ export const useSaveAnswer = () => {
       await testService.saveAnswer(attemptId, questionId, option);
     } catch (err) {
       console.log("Auto-save failed:", err.message);
-      // We usually don't alert the user for every auto-save failure, just log it
     }
   };
 

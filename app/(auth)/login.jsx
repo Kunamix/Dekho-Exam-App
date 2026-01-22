@@ -35,6 +35,7 @@ export default function LoginScreen() {
 
   const handleGetOTP = async () => {
     Keyboard.dismiss();
+
     if (phone.length !== 10) {
       Alert.alert("Invalid Number", "Please enter a valid 10-digit number");
       return;
@@ -44,15 +45,10 @@ export default function LoginScreen() {
       const response = await login(phone);
 
       if (response && response.success) {
-        // ✅ FIX: Save the Verification Token from response
-        const vToken = response.data?.verificationToken;
-        // if (vToken) {
-        //   await AsyncStorage.setItem("verificationToken", vToken);
-        //   console.log("✅ Verification Token Saved");
-        // }
-
+        // Save phone for OTP screen
         await AsyncStorage.setItem("authPhone", phone);
 
+        // Navigate to OTP screen with phone parameter
         router.push({
           pathname: "/(auth)/otp",
           params: { phone: phone },
@@ -62,6 +58,7 @@ export default function LoginScreen() {
       console.log("Login flow interrupted", err);
     }
   };
+
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={styles.container}>
@@ -115,7 +112,7 @@ export default function LoginScreen() {
                       maxLength={10}
                       value={phone}
                       onChangeText={setPhone}
-                      editable={!loading} // Disable input while loading
+                      editable={!loading}
                     />
                   </View>
                 </View>
@@ -154,7 +151,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: PRIMARY_COLOR,
   },
-  /* Subtle Background Circles */
   bgCircle1: {
     position: "absolute",
     top: -50,
@@ -206,12 +202,11 @@ const styles = StyleSheet.create({
     bottom: -10,
     transform: [{ scaleX: 1.5 }],
   },
-  /* Card Styles */
   card: {
     backgroundColor: "#FFF",
     borderRadius: 24,
     padding: 30,
-    paddingBottom: 50, // Space for the FAB
+    paddingBottom: 50,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
@@ -264,13 +259,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
   },
-  /* Floating Button */
   fabContainer: {
     position: "absolute",
-    bottom: -28, // Pulls the button halfway out of the card
+    bottom: -28,
     alignSelf: "center",
     borderRadius: 30,
-    backgroundColor: "#FFF", // White ring border effect
+    backgroundColor: "#FFF",
     padding: 6,
   },
   fab: {

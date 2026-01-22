@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ThemeProvider, useTheme } from "../context/ThemeContext";
-import { AuthProvider } from "../src/hooks/AuthContext";
+import { AuthProvider, useAuth } from "../src/hooks/AuthContext";
 
 // Prevent splash from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -14,6 +14,12 @@ SplashScreen.preventAutoHideAsync();
 /* ================= ROOT NAV ================= */
 function RootNavigator() {
   const { isDark } = useTheme();
+  const { loading } = useAuth();
+
+  // Don't render navigation until auth is checked
+  if (loading) {
+    return null;
+  }
 
   return (
     <>
@@ -28,10 +34,13 @@ function RootNavigator() {
         {/* Entry Gate */}
         <Stack.Screen name="index" />
 
-        {/* Auth Flow */}
+        {/* Onboarding */}
+        <Stack.Screen name="onboarding" />
+
+        {/* Auth Flow (Login, OTP, Profile Setup) */}
         <Stack.Screen name="(auth)" />
 
-        {/* Main App */}
+        {/* Main App (Tabs) */}
         <Stack.Screen name="(tabs)" />
       </Stack>
     </>
@@ -51,6 +60,7 @@ export default function RootLayout() {
     }
   }, [fontsLoaded]);
 
+  // Keep splash screen visible until fonts are loaded
   if (!fontsLoaded) return null;
 
   return (
